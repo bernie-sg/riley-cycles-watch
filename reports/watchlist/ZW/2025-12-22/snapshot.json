@@ -1,0 +1,61 @@
+{
+  "symbol": "ZW",
+  "aliases": [],
+  "asof_td_label": "2025-12-22",
+  "asof_td_index": 35,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 44,
+      "anchor": "2025-12-18"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 21,
+      "anchor": "2026-03-22"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "IN_WINDOW",
+      "prewindow_start": "2025-12-15",
+      "prewindow_end": "2025-12-15",
+      "core_start": "2025-12-16",
+      "core_end": "2025-12-22",
+      "median": "2025-12-18",
+      "days_to_core_start": 0
+    },
+    "WEEKLY": {
+      "status": "NONE",
+      "prewindow_start": "2026-03-06",
+      "prewindow_end": "2026-03-06",
+      "core_start": "2026-03-13",
+      "core_end": "2026-04-10",
+      "median": "2026-03-27",
+      "weeks_to_core_start": 11
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": false,
+    "daily_core": "2025-12-16 \u2192 2025-12-22",
+    "weekly_core": "2026-03-13 \u2192 2026-04-10"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Turning down into a 3/02\u20134/06 trough; looks poised to move through $492.25 \u2014 Weekly chart",
+        "Short-term selloffs accelerating; prefer fade of upticks \u2014 Daily chart"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

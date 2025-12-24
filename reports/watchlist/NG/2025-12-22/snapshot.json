@@ -1,0 +1,61 @@
+{
+  "symbol": "NG",
+  "aliases": [],
+  "asof_td_label": "2025-12-22",
+  "asof_td_index": 35,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 54,
+      "anchor": "2026-02-11"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 52,
+      "anchor": "2026-02-08"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE",
+      "prewindow_start": "2026-02-06",
+      "prewindow_end": "2026-02-06",
+      "core_start": "2026-02-09",
+      "core_end": "2026-02-13",
+      "median": "2026-02-11",
+      "days_to_core_start": 35
+    },
+    "WEEKLY": {
+      "status": "NONE",
+      "prewindow_start": "2026-01-23",
+      "prewindow_end": "2026-01-23",
+      "core_start": "2026-01-30",
+      "core_end": "2026-02-27",
+      "median": "2026-02-13",
+      "weeks_to_core_start": 5
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": true,
+    "daily_core": "2026-02-09 \u2192 2026-02-13",
+    "weekly_core": "2026-01-30 \u2192 2026-02-27"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Cycle trough due 12/22\u20133/30; trend turned down sharply \u2014 Weekly chart",
+        "Near-term bounces favored as short setups; sell zone is around $4.25\u2013$4.46 \u2014 Daily chart"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

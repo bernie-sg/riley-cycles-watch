@@ -1,0 +1,52 @@
+{
+  "symbol": "GBPUSD",
+  "aliases": [],
+  "asof_td_label": "2025-12-24",
+  "asof_td_index": 37,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 27,
+      "anchor": "2025-12-29"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 30,
+      "anchor": "2026-02-22"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE"
+    },
+    "WEEKLY": {
+      "status": "PREWINDOW",
+      "prewindow_start": "2025-12-26",
+      "prewindow_end": "2026-01-02",
+      "core_start": "2026-01-09",
+      "core_end": "2026-02-20",
+      "median": "2026-02-27",
+      "weeks_to_core_start": 2
+    }
+  },
+  "overlap": {},
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Weekly low due 1/19\u20133/30",
+        "A move over $1.3600 would be a sign of a shifting cycle \u2014 Weekly chart",
+        "Higher-low base forming; near-term trough due 12/24\u20131/02"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

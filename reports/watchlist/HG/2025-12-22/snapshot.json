@@ -1,0 +1,75 @@
+{
+  "symbol": "HG",
+  "aliases": [],
+  "asof_td_label": "2025-12-22",
+  "asof_td_index": 15,
+  "asof_tw_index": 3,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 28,
+      "anchor": "2026-01-23"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 19,
+      "anchor": "2025-12-21"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE",
+      "prewindow_start": "2026-01-20",
+      "prewindow_end": "2026-01-20",
+      "core_start": "2026-01-21",
+      "core_end": "2026-01-27",
+      "median": "2026-01-23",
+      "days_to_core_start": 22
+    },
+    "WEEKLY": {
+      "status": "IN_WINDOW",
+      "prewindow_start": "2025-12-05",
+      "prewindow_end": "2025-12-05",
+      "core_start": "2025-12-12",
+      "core_end": "2026-01-09",
+      "median": "2025-12-26",
+      "weeks_to_core_start": 0
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": false,
+    "daily_core": "2026-01-21 \u2192 2026-01-27",
+    "weekly_core": "2025-12-12 \u2192 2026-01-09"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "LEVELS",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Rising phase intact, holding \u2014 Weekly chart",
+        "Sideways rectangle; trigger above $5.5250 opens $5.73\u2013$5.86 \u2014 Daily chart"
+      ],
+      "asof": "2025-12-19"
+    }
+  ],
+  "astro": {
+    "next_primary": {
+      "date": "2026-01-07",
+      "t_minus_td": 12,
+      "name": "Primary astro window (start)",
+      "category": "REVERSAL",
+      "confidence": null
+    },
+    "backup_events": [
+      {
+        "date": "2026-01-03",
+        "t_minus_td": 10,
+        "name": "Secondary astro date",
+        "category": "REVERSAL",
+        "confidence": null
+      }
+    ]
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "symbol": "PL",
+  "aliases": [],
+  "asof_td_label": "2025-12-22",
+  "asof_td_index": 35,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 35,
+      "anchor": "2025-12-24"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 36,
+      "anchor": "2025-12-21"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "IN_WINDOW",
+      "prewindow_start": "2025-12-19",
+      "prewindow_end": "2025-12-19",
+      "core_start": "2025-12-22",
+      "core_end": "2025-12-26",
+      "median": "2025-12-24",
+      "days_to_core_start": 0
+    },
+    "WEEKLY": {
+      "status": "IN_WINDOW",
+      "prewindow_start": "2025-12-05",
+      "prewindow_end": "2025-12-05",
+      "core_start": "2025-12-12",
+      "core_end": "2026-01-09",
+      "median": "2025-12-26",
+      "weeks_to_core_start": 0
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": true,
+    "daily_core": "2025-12-22 \u2192 2025-12-26",
+    "weekly_core": "2025-12-12 \u2192 2026-01-09"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Exploded higher; RS positive \u2013 Weekly chart",
+        "Platinum trades in a trend, watch for consolidations to build for another move up \u2013 Daily chart"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

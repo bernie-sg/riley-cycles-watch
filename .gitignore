@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+._*
+Thumbs.db
+
+# Logs
+*.log
+logs/*.log
+
+# Database backups
+db/backups/
+*.sqlite-backup
+
+# Temporary files
+*.tmp
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local config overrides
+config.local.toml

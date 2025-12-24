@@ -1,0 +1,61 @@
+{
+  "symbol": "DXY",
+  "aliases": [],
+  "asof_td_label": "2025-12-24",
+  "asof_td_index": 37,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 54,
+      "anchor": "2026-02-07"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 42,
+      "anchor": "2026-05-03"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE",
+      "prewindow_start": "2026-01-05",
+      "prewindow_end": "2026-01-06",
+      "core_start": "2026-01-07",
+      "core_end": "2026-01-15",
+      "median": "2026-02-09",
+      "days_to_core_start": 10
+    },
+    "WEEKLY": {
+      "status": "NONE",
+      "prewindow_start": "2026-03-06",
+      "prewindow_end": "2026-03-13",
+      "core_start": "2026-03-20",
+      "core_end": "2026-05-01",
+      "median": "2026-05-08",
+      "weeks_to_core_start": 12
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": false,
+    "daily_core": "2026-01-07 \u2192 2026-01-15",
+    "weekly_core": "2026-03-20 \u2192 2026-05-01"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Trough due 11/3\u201312/29; holding the $97.87 level but RS still down \u2014 Weekly chart",
+        "Bias favors left-hand translation until price re-enters range above $99.00 \u2014 Daily chart"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "symbol": "ES",
+  "as_of_date": "2025-12-19",
+  "generated_at": "2025-12-19T10:06:17.032247",
+  "files": {
+    "context": "/Users/bernie/Documents/AI/Riley Project/artifacts/packets/ES/2025-12-19/context.json",
+    "levels": "/Users/bernie/Documents/AI/Riley Project/artifacts/packets/ES/2025-12-19/levels.json",
+    "pivots": "/Users/bernie/Documents/AI/Riley Project/artifacts/packets/ES/2025-12-19/pivots.json",
+    "volume": "/Users/bernie/Documents/AI/Riley Project/artifacts/packets/ES/2025-12-19/volume.json",
+    "gamma": "/Users/bernie/Documents/AI/Riley Project/artifacts/packets/ES/2025-12-19/gamma.json",
+    "diff": "/Users/bernie/Documents/AI/Riley Project/artifacts/packets/ES/2025-12-19/diff.json"
+  },
+  "cycles": {
+    "status": "missing"
+  }
+}

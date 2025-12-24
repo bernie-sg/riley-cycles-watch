@@ -1,0 +1,111 @@
+{
+  "levels": [
+    {
+      "tier": 1,
+      "level_price": 1002.0,
+      "source": "pivot",
+      "label": "SWING_LOW",
+      "date": "2018-05-11T00:00:00+00:00"
+    },
+    {
+      "tier": 1,
+      "level_price": 1002.0,
+      "source": "pivot",
+      "label": "SWING_LOW",
+      "date": "2015-02-20T01:00:00+00:00"
+    },
+    {
+      "tier": 1,
+      "level_price": 1000.25,
+      "source": "pivot",
+      "label": "SWING_LOW",
+      "date": "2001-09-26T22:00:00+00:00"
+    },
+    {
+      "tier": 1,
+      "level_price": 1003.5,
+      "source": "pivot",
+      "label": "SWING_LOW",
+      "date": "2014-12-05T01:00:00+00:00"
+    },
+    {
+      "tier": 1,
+      "level_price": 1002.5,
+      "source": "pivot",
+      "label": "SWING_LOW",
+      "date": "2009-10-23T00:00:00+00:00"
+    },
+    {
+      "tier": 2,
+      "level_price": 6302.273745608339,
+      "source": "volume_profile",
+      "label": "252TD_POC",
+      "window": "252 trading days",
+      "date": null
+    },
+    {
+      "tier": 2,
+      "level_price": 6586.2180633577955,
+      "source": "volume_profile",
+      "label": "180TD_POC",
+      "window": "180 trading days",
+      "date": null
+    },
+    {
+      "tier": 2,
+      "level_price": 6795.506461725824,
+      "source": "volume_profile",
+      "label": "90TD_POC",
+      "window": "90 trading days",
+      "date": null
+    },
+    {
+      "tier": 3,
+      "level_price": 6989.25,
+      "source": "range",
+      "label": "20TD_HIGH",
+      "window": "20 trading days",
+      "date": null
+    },
+    {
+      "tier": 3,
+      "level_price": 6733.0,
+      "source": "range",
+      "label": "20TD_LOW",
+      "window": "20 trading days",
+      "date": null
+    },
+    {
+      "tier": 3,
+      "level_price": 7012.75,
+      "source": "range",
+      "label": "60TD_HIGH",
+      "window": "60 trading days",
+      "date": null
+    },
+    {
+      "tier": 3,
+      "level_price": 6596.25,
+      "source": "range",
+      "label": "60TD_LOW",
+      "window": "60 trading days",
+      "date": null
+    },
+    {
+      "tier": 3,
+      "level_price": 7012.75,
+      "source": "range",
+      "label": "252TD_HIGH",
+      "window": "252 trading days",
+      "date": null
+    },
+    {
+      "tier": 3,
+      "level_price": 4832.0,
+      "source": "range",
+      "label": "252TD_LOW",
+      "window": "252 trading days",
+      "date": null
+    }
+  ]
+}

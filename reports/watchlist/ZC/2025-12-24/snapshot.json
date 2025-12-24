@@ -1,0 +1,51 @@
+{
+  "symbol": "ZC",
+  "aliases": [],
+  "asof_td_label": "2025-12-24",
+  "asof_td_index": 37,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 33,
+      "anchor": "2026-01-04"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 25,
+      "anchor": "2026-02-08"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE"
+    },
+    "WEEKLY": {
+      "status": "IN_WINDOW",
+      "prewindow_start": "2025-12-12",
+      "prewindow_end": "2025-12-19",
+      "core_start": "2025-12-26",
+      "core_end": "2026-02-06",
+      "median": "2026-02-13",
+      "weeks_to_core_start": 0
+    }
+  },
+  "overlap": {},
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Weekly rising mode with a higher low base forming",
+        "In a holding pattern \u2013 Daily chart"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

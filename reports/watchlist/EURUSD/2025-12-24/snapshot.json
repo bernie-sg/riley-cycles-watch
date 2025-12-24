@@ -1,0 +1,61 @@
+{
+  "symbol": "EURUSD",
+  "aliases": [],
+  "asof_td_label": "2025-12-24",
+  "asof_td_index": 37,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 64,
+      "anchor": "2026-01-26"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 30,
+      "anchor": "2026-02-22"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "IN_WINDOW",
+      "prewindow_start": "2025-12-22",
+      "prewindow_end": "2025-12-23",
+      "core_start": "2025-12-24",
+      "core_end": "2026-01-01",
+      "median": "2026-01-26",
+      "days_to_core_start": 0
+    },
+    "WEEKLY": {
+      "status": "PREWINDOW",
+      "prewindow_start": "2025-12-26",
+      "prewindow_end": "2026-01-02",
+      "core_start": "2026-01-09",
+      "core_end": "2026-02-20",
+      "median": "2026-02-27",
+      "weeks_to_core_start": 2
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": false,
+    "daily_core": "2025-12-24 \u2192 2026-01-01",
+    "weekly_core": "2026-01-09 \u2192 2026-02-20"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Rangebound with a trough due in March \u2013 Weekly chart",
+        "Grinding higher but still choppy; watching $1.1820 area \u2014 Daily chart"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

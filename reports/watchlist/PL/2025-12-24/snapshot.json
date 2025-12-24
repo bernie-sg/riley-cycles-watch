@@ -1,0 +1,45 @@
+{
+  "symbol": "PL",
+  "aliases": [],
+  "asof_td_label": "2025-12-24",
+  "asof_td_index": 37,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 35,
+      "anchor": "2025-12-24"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 36,
+      "anchor": "2025-12-21"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE"
+    },
+    "WEEKLY": {
+      "status": "NONE"
+    }
+  },
+  "overlap": {},
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Exploded higher; RS positive \u2013 Weekly chart",
+        "Platinum trades in a trend, watch for consolidations to build for another move up \u2013 Daily chart"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

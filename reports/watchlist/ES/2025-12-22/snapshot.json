@@ -1,0 +1,89 @@
+{
+  "symbol": "ES",
+  "aliases": [],
+  "asof_td_label": "2025-12-22",
+  "asof_td_index": 15,
+  "asof_tw_index": 3,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 26,
+      "anchor": "2025-12-28"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 37,
+      "anchor": "2026-01-04"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE",
+      "prewindow_start": "2025-12-24",
+      "prewindow_end": "2025-12-24",
+      "core_start": "2025-12-25",
+      "core_end": "2025-12-31",
+      "median": "2025-12-29",
+      "days_to_core_start": 3
+    },
+    "WEEKLY": {
+      "status": "IN_WINDOW",
+      "prewindow_start": "2025-12-19",
+      "prewindow_end": "2025-12-19",
+      "core_start": "2025-12-26",
+      "core_end": "2026-01-23",
+      "median": "2026-01-09",
+      "weeks_to_core_start": 0
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": true,
+    "daily_core": "2025-12-25 \u2192 2025-12-31",
+    "weekly_core": "2025-12-26 \u2192 2026-01-23"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "SPX",
+      "bullets": [
+        "Still in a trading range, upside is capped \u2013 Weekly chart",
+        "AI plays are getting weaker, 2026 will likely be a lot different than 2025",
+        "A weekly cycle trough is due 12-1 \u2013 1/19",
+        "A downside zone is at $6668 \u2013 $6601, a move below would be cause for concern \u2013 Daily chart",
+        "More likely ES makes one more low attempt (a re-test / higher-low) rather than the correction being completely finished",
+        "Daily is stalling under ~6,910 while still inside the weekly trough window",
+        "Key pivot: If ES accepts above ~6,910, odds shift to \"bottom is in\"",
+        "Key pivot: If ES accepts below ~6,727, odds shift to another push down to seek the low",
+        "*Price levels reference SPX, not ES"
+      ],
+      "asof": "2025-12-19"
+    }
+  ],
+  "astro": {
+    "next_primary": {
+      "date": "2025-12-29",
+      "t_minus_td": 5,
+      "name": "Key astro date",
+      "category": "REVERSAL",
+      "confidence": null
+    },
+    "backup_events": [
+      {
+        "date": "2025-01-22",
+        "t_minus_td": 0,
+        "name": "Moon Node Transit",
+        "category": "VOL",
+        "confidence": 60
+      },
+      {
+        "date": "2026-01-03",
+        "t_minus_td": 10,
+        "name": "Secondary astro date",
+        "category": "REVERSAL",
+        "confidence": null
+      }
+    ]
+  }
+}

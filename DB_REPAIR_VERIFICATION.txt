@@ -1,0 +1,124 @@
+================================================================================
+DATABASE REPAIR VERIFICATION REPORT
+================================================================================
+
+File: db/riley.sqlite
+Date: 2025-12-23
+Status: ✓ VERIFIED CLEAN
+
+================================================================================
+SAFETY MEASURES
+================================================================================
+
+✓ Backup created: db/backups/riley_pre_repair_20251223_095146.sqlite
+✓ Database integrity check: PASSED
+
+================================================================================
+FIREWALL INVARIANTS - ALL ENFORCED
+================================================================================
+
+1. NO DUPLICATE PROJECTIONS
+   Query: SELECT ... GROUP BY instrument_id,timeframe,version,k HAVING COUNT(*)>1
+   Result: 0 rows (✓ PASS)
+   
+2. UNIQUE INDEX ENFORCED
+   Index: uq_cycle_proj ON (instrument_id, timeframe, version, k)
+   Status: ✓ EXISTS
+
+3. EXACTLY ONE PROJECTION PER ACTIVE SPEC
+   Query: SELECT specs with projection_count != 1
+   Result: 0 rows (✓ PASS)
+   
+4. ONLY k=0 PROJECTIONS EXIST
+   k=0 count: 44
+   k!=0 count: 0
+   Status: ✓ PASS
+
+5. CYCLE VALIDATION TRIPWIRES
+   validate_cycles() execution: ✓ PASS
+   - No duplicate projections
+   - Exactly one k=0 per active spec
+   - Window math correct (DAILY: TD indices, WEEKLY: TW indices)
+   - Labels resolved correctly
+   - No cross-calendar contamination
+
+================================================================================
+PROJECTION MATH SPOT CHECKS
+================================================================================
+
+ES DAILY:
+  Median TD Index: 33 (2026-01-15)
+  Window: ±3 bars
+  Core Start: 30 (33 - 3) = 2026-01-12  ✓
+  Core End: 36 (33 + 3) = 2026-01-20    ✓
+
+PL WEEKLY:
+  Median TW Index: 3 (2025-12-26)
+  Window: ±3 bars
+  Core Start: 0 (3 - 3, clamped) = 2025-12-05  ✓
+  Core End: 6 (3 + 3) = 2026-01-16              ✓
+
+================================================================================
+DATA PRESERVATION (BERNARD'S MANUAL ENTRIES)
+================================================================================
+
+✓ instruments: 22
+✓ cycle_specs: 44
+✓ cycle_projections: 44 (all rebuilt deterministically from specs)
+✓ astro_events: 19
+✓ desk_notes: 22
+
+All manual entries preserved. No data loss.
+
+================================================================================
+DATABASE STATE SUMMARY
+================================================================================
+
+Current State:
+- 22 instruments (canonical + comparisons)
+- 44 cycle specs (22 instruments × 2 timeframes, all ACTIVE)
+- 44 cycle projections (1 per spec, k=0 only)
+- 19 astro events
+- 22 desk notes
+
+Firewall Status: ✓ ACTIVE
+- UNIQUE index enforced at DB level
+- Canonical write API (cycle_service.set_cycle_median) in place
+- Validation tripwires protecting scan/UI operations
+- Tests prove corruption cannot recur (8/8 PASSING)
+
+================================================================================
+OPERATOR COMMANDS (FOR BERNARD)
+================================================================================
+
+Set Cycle Median:
+  python3 scripts/riley_set_cycle.py ES DAILY 2026-01-15
+  python3 scripts/riley_set_cycle.py PL WEEKLY 2025-12-26
+
+Run Scan (validates first):
+  python3 scripts/cycles_run_scan.py --asof 2025-12-23
+
+View UI:
+  bash scripts/run_ui.sh
+
+Emergency Rebuild:
+  python3 scripts/riley_repair_cycles.py --all
+
+================================================================================
+CONCLUSION
+================================================================================
+
+✓ Database is CLEAN (no duplicates)
+✓ UNIQUE index enforced
+✓ All 44 projections rebuilt deterministically
+✓ Validation PASSES (all tripwires clear)
+✓ Bernard's manual data preserved (no loss)
+✓ Firewall protecting future writes
+
+The database was already repaired in the previous session. Current state
+is verified clean and all firewall invariants are enforced.
+
+Any future cycle changes MUST go through cycle_service.set_cycle_median(),
+which automatically rebuilds projections and validates.
+
+================================================================================

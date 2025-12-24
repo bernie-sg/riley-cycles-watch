@@ -1,0 +1,61 @@
+{
+  "symbol": "XLE",
+  "aliases": [],
+  "asof_td_label": "2025-12-22",
+  "asof_td_index": 35,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 26,
+      "anchor": "2025-12-31"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 29,
+      "anchor": "2026-05-03"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE",
+      "prewindow_start": "2025-12-26",
+      "prewindow_end": "2025-12-26",
+      "core_start": "2025-12-29",
+      "core_end": "2026-01-02",
+      "median": "2025-12-31",
+      "days_to_core_start": 5
+    },
+    "WEEKLY": {
+      "status": "NONE",
+      "prewindow_start": "2026-04-17",
+      "prewindow_end": "2026-04-17",
+      "core_start": "2026-04-24",
+      "core_end": "2026-05-22",
+      "median": "2026-05-08",
+      "weeks_to_core_start": 17
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": false,
+    "daily_core": "2025-12-29 \u2192 2026-01-02",
+    "weekly_core": "2026-04-24 \u2192 2026-05-22"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "LEVELS",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Bounce permission: reclaim + hold above ~44.8\u201345.2 (back above the broken micro-shelf / next pendulum lane)",
+        "Failure trigger: acceptance below ~43.6\u201343.8 \u2192 daily trough fails, next leg down opens"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

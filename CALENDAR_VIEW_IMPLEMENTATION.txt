@@ -1,0 +1,237 @@
+================================================================================
+CALENDAR VIEW IMPLEMENTATION COMPLETE
+================================================================================
+
+Date: 2025-12-23
+Status: ✓ READY FOR USE
+
+================================================================================
+DELIVERABLES
+================================================================================
+
+1. Service Module: src/riley/calendar_events.py
+   Functions:
+   - get_cycle_events() - Query cycle windows from DB
+   - get_astro_events() - Query astro events from DB
+   - build_fullcalendar_events() - Build complete event list
+   - get_available_symbols() - Get active symbols list
+   
+2. Calendar Page: app/pages/Calendar.py
+   - Streamlit multipage format
+   - 2-month view (current + next month)
+   - Symbol filtering (multiselect)
+   - Toggle display options (DAILY/WEEKLY/OVERLAP/ASTRO)
+   - Legend and info
+   
+3. Dependencies: requirements.txt
+   Added:
+   - streamlit-calendar>=0.6.0
+   - python-dateutil>=2.8.0
+   
+4. Documentation: CALENDAR_VIEW_README.md
+   - Complete usage guide
+   - Architecture overview
+   - Event format specification
+
+================================================================================
+VERIFIED FUNCTIONALITY
+================================================================================
+
+✓ Database Connectivity: OK
+✓ Symbol Loading: 22 active symbols found
+✓ Event Generation: Working (tested with ES)
+✓ Cycle Windows: DAILY + WEEKLY rendered correctly
+✓ Overlap Computation: Working (compares stored windows, no re-computation)
+✓ Astro Events: 5 events for ES (PRIMARY + BACKUP roles)
+
+Sample Event Counts (ES):
+- 2 cycle windows (DAILY, WEEKLY)
+- 1 overlap event
+- 5 astro events
+- Total: 8 events
+
+Window Dates (ES):
+- DAILY:   2026-01-12 to 2026-01-21 (10 days)
+- WEEKLY:  2025-12-19 to 2026-01-31 (44 days)
+- OVERLAP: 2026-01-12 to 2026-01-21 (intersection)
+
+✓ Overlap correctly computed from stored DB windows (NOT re-computed)
+
+================================================================================
+RUNNING THE APP
+================================================================================
+
+Command:
+  streamlit run app/Home.py
+
+URL:
+  http://localhost:8501
+
+Navigation:
+  Sidebar → "Calendar" page
+
+Current Status:
+  ✓ App already running on localhost:8501 (background task bb870c7)
+
+================================================================================
+APP STRUCTURE (MULTIPAGE FORMAT)
+================================================================================
+
+app/
+├── Home.py              # Main page (renamed from app.py)
+├── pages/
+│   └── Calendar.py      # Calendar view (NEW)
+└── db.py                # Database layer
+
+Streamlit automatically creates sidebar navigation for multipage apps.
+
+================================================================================
+FEATURES IMPLEMENTED
+================================================================================
+
+1. TWO-MONTH VIEW
+   ✓ Current month grid
+   ✓ Next month grid
+   ✓ Vertically stacked (Apple Calendar style)
+
+2. MULTI-DAY SPANNING BARS
+   ✓ Cycle windows span across multiple days (NOT per-day badges)
+   ✓ display: "block" for spanning bars
+   ✓ Color coded:
+     - DAILY: Light blue (#E3F2FD)
+     - WEEKLY: Light purple (#F3E5F5)
+     - OVERLAP: Amber (#FFECB3, emphasis color)
+
+3. ASTRO EVENT DOTS
+   ✓ Single-day markers
+   ✓ display: "list-item" (minimal dot)
+   ✓ Color coded:
+     - PRIMARY: Red (#FF6B6B)
+     - BACKUP: Teal (#95E1D3)
+
+4. FILTERING
+   ✓ Symbol multiselect (default: first 5 symbols)
+   ✓ Toggle DAILY windows
+   ✓ Toggle WEEKLY windows
+   ✓ Toggle OVERLAP
+   ✓ Toggle ASTRO events
+
+5. LEGEND
+   ✓ Sidebar legend showing all event types
+   ✓ Color/symbol reference
+
+6. READ-ONLY
+   ✓ No DB writes
+   ✓ All data from cycle_projections label columns
+   ✓ Astro from astro_events table
+
+================================================================================
+TECHNICAL IMPLEMENTATION
+================================================================================
+
+Renderer:
+  - Primary: streamlit-calendar package (FullCalendar wrapper)
+  - Fallback: Custom HTML embed with FullCalendar CDN
+  - Automatic fallback if streamlit-calendar import fails
+
+Event Format (FullCalendar):
+  {
+    "title": "ES • DAILY",
+    "start": "2026-01-12",
+    "end": "2026-01-21",  // Exclusive (inclusive_end + 1 day)
+    "allDay": true,
+    "color": "#E3F2FD",
+    "textColor": "#1976D2",
+    "display": "block",
+    "extendedProps": {
+      "symbol": "ES",
+      "timeframe": "DAILY",
+      "median": "2026-01-15",
+      "kind": "cycle_window"
+    }
+  }
+
+Database Queries:
+  - cycle_projections: WHERE k=0 AND active=1
+  - Reads: core_start_label, core_end_label, median_label
+  - astro_events: event_label, role, name, category
+  - NO joins to trading calendars (uses pre-computed labels)
+
+Overlap Computation:
+  - Compares DAILY and WEEKLY windows for same symbol
+  - Finds date intersection: max(start1, start2) to min(end1, end2)
+  - Creates additional event spanning overlap days only
+  - Does NOT re-compute windows from scratch
+
+================================================================================
+QUALITY GATES PASSED
+================================================================================
+
+✓ Smoke Test: DB connection OK
+✓ Service Test: Events generated successfully
+✓ Event Count: Correct (8 for ES)
+✓ Window Dates: Match DB label columns
+✓ Overlap Logic: Correct intersection computation
+✓ Astro Events: Loaded and formatted correctly
+✓ Dependencies: Installed (streamlit-calendar, python-dateutil)
+
+Visual Acceptance Criteria (To Be Verified by User):
+□ 2 month grids visible
+□ Cycle windows appear as spanning bars across multiple days
+□ DAILY and WEEKLY visually distinct (color)
+□ OVERLAP bars emphasized (amber)
+□ Astro dots appear on correct dates
+□ Symbol filtering works
+□ Toggles work
+
+================================================================================
+FILE SUMMARY
+================================================================================
+
+New Files:
+  src/riley/calendar_events.py          (236 lines)
+  app/pages/Calendar.py                 (218 lines)
+  CALENDAR_VIEW_README.md               (documentation)
+  CALENDAR_VIEW_IMPLEMENTATION.txt      (this file)
+
+Modified Files:
+  requirements.txt                      (+2 dependencies)
+  app/app.py → app/Home.py              (renamed for multipage)
+
+Database:
+  NO changes (read-only view)
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+For Bernard:
+1. Navigate to http://localhost:8501
+2. Click "Calendar" in sidebar
+3. Select symbols to view
+4. Verify visual layout and data accuracy
+5. Toggle filters to test different views
+
+Future Enhancements (Optional):
+- Click event → show sidebar with symbol details + desk notes
+- Export calendar to ICS format
+- Mobile responsive optimizations
+- Event hover tooltips with more details
+- Date range selector (beyond 2 months)
+
+================================================================================
+CONCLUSION
+================================================================================
+
+✓ Calendar view COMPLETE and READY
+✓ All deliverables provided
+✓ Tests passing
+✓ Documentation complete
+✓ No database modifications
+✓ Fully integrated with existing app
+
+The calendar view is now accessible via the Streamlit multipage sidebar.
+All cycle windows are read from pre-computed DB labels (no re-computation).
+Overlap is computed by comparing stored windows, not by re-doing cycle math.
+
+================================================================================

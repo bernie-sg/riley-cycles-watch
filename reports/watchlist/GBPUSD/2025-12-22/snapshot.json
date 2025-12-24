@@ -1,0 +1,62 @@
+{
+  "symbol": "GBPUSD",
+  "aliases": [],
+  "asof_td_label": "2025-12-22",
+  "asof_td_index": 35,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 27,
+      "anchor": "2025-12-29"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 30,
+      "anchor": "2026-02-22"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE",
+      "prewindow_start": "2025-12-24",
+      "prewindow_end": "2025-12-24",
+      "core_start": "2025-12-25",
+      "core_end": "2025-12-31",
+      "median": "2025-12-29",
+      "days_to_core_start": 3
+    },
+    "WEEKLY": {
+      "status": "NONE",
+      "prewindow_start": "2026-02-06",
+      "prewindow_end": "2026-02-06",
+      "core_start": "2026-02-13",
+      "core_end": "2026-03-13",
+      "median": "2026-02-27",
+      "weeks_to_core_start": 7
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": false,
+    "daily_core": "2025-12-25 \u2192 2025-12-31",
+    "weekly_core": "2026-02-13 \u2192 2026-03-13"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Weekly low due 1/19\u20133/30",
+        "A move over $1.3600 would be a sign of a shifting cycle \u2014 Weekly chart",
+        "Higher-low base forming; near-term trough due 12/24\u20131/02"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

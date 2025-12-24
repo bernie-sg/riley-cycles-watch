@@ -1,0 +1,61 @@
+{
+  "symbol": "USDCAD",
+  "aliases": [],
+  "asof_td_label": "2025-12-22",
+  "asof_td_index": 58,
+  "asof_tw_index": 12,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 28,
+      "anchor": "2025-12-25"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 20,
+      "anchor": "2026-04-19"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "PREWINDOW",
+      "prewindow_start": "2025-12-22",
+      "prewindow_end": "2025-12-22",
+      "core_start": "2025-12-23",
+      "core_end": "2025-12-29",
+      "median": "2025-12-25",
+      "days_to_core_start": 1
+    },
+    "WEEKLY": {
+      "status": "NONE",
+      "prewindow_start": "2026-04-03",
+      "prewindow_end": "2026-04-03",
+      "core_start": "2026-04-10",
+      "core_end": "2026-05-08",
+      "median": "2026-04-24",
+      "weeks_to_core_start": 15
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": false,
+    "daily_core": "2025-12-23 \u2192 2025-12-29",
+    "weekly_core": "2026-04-10 \u2192 2026-05-08"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Weekly trough due 10/27\u201312/22; in a corrective period",
+        "Ideally would hold above $1.3842  \u2014 Daily chart"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

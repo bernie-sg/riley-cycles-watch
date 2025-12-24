@@ -1,0 +1,50 @@
+{
+  "symbol": "RTY",
+  "aliases": [],
+  "asof_td_label": "2025-12-24",
+  "asof_td_index": 37,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 17,
+      "anchor": "2025-12-25"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 37,
+      "anchor": "2026-01-04"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE"
+    },
+    "WEEKLY": {
+      "status": "IN_WINDOW",
+      "prewindow_start": "2025-11-07",
+      "prewindow_end": "2025-11-14",
+      "core_start": "2025-11-21",
+      "core_end": "2026-01-02",
+      "median": "2026-01-09",
+      "weeks_to_core_start": 0
+    }
+  },
+  "overlap": {},
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Short-term peaking; look for a pullback into $2,485\u2013$2,415 then attempt to turn up"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

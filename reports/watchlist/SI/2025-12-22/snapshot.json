@@ -1,0 +1,62 @@
+{
+  "symbol": "SI",
+  "aliases": [],
+  "asof_td_label": "2025-12-22",
+  "asof_td_index": 35,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 24,
+      "anchor": "2026-01-18"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 32,
+      "anchor": "2026-06-21"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE",
+      "prewindow_start": "2026-01-14",
+      "prewindow_end": "2026-01-14",
+      "core_start": "2026-01-15",
+      "core_end": "2026-01-21",
+      "median": "2026-01-19",
+      "days_to_core_start": 18
+    },
+    "WEEKLY": {
+      "status": "NONE",
+      "prewindow_start": "2026-06-05",
+      "prewindow_end": "2026-06-05",
+      "core_start": "2026-06-12",
+      "core_end": "2026-07-10",
+      "median": "2026-06-26",
+      "weeks_to_core_start": 24
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": false,
+    "daily_core": "2026-01-15 \u2192 2026-01-21",
+    "weekly_core": "2026-06-12 \u2192 2026-07-10"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Powerful uptrend with a level up at $71.60 \u2014 Weekly chart",
+        "Still in a rising mode and acting very strong \u2013 Daily chart",
+        "Unless it loses $59.23 it will stay bullish \u2013 Daily chart"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

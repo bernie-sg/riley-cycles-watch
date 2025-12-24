@@ -1,0 +1,68 @@
+{
+  "symbol": "CL",
+  "aliases": [],
+  "asof_td_label": "2025-12-22",
+  "asof_td_index": 15,
+  "asof_tw_index": 3,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 68,
+      "anchor": "2026-01-24"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 76,
+      "anchor": "2026-02-08"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE",
+      "prewindow_start": "2026-01-21",
+      "prewindow_end": "2026-01-21",
+      "core_start": "2026-01-22",
+      "core_end": "2026-01-28",
+      "median": "2026-01-26",
+      "days_to_core_start": 23
+    },
+    "WEEKLY": {
+      "status": "NONE",
+      "prewindow_start": "2026-01-23",
+      "prewindow_end": "2026-01-23",
+      "core_start": "2026-01-30",
+      "core_end": "2026-02-27",
+      "median": "2026-02-13",
+      "weeks_to_core_start": 5
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": false,
+    "daily_core": "2026-01-22 \u2192 2026-01-28",
+    "weekly_core": "2026-01-30 \u2192 2026-02-27"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "In an intermediate-term correction late in window",
+        "A breakdown below $55.96 opens risk of a final washout \u2014 Weekly chart",
+        "Short-term very weak; minor trough due late January with momentum pointing down"
+      ],
+      "asof": "2025-12-19"
+    }
+  ],
+  "astro": {
+    "next_primary": {
+      "date": "2026-01-23",
+      "t_minus_td": 24,
+      "name": "Primary astro date",
+      "category": "REVERSAL",
+      "confidence": null
+    },
+    "backup_events": []
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "asof_td_label": "2025-01-06",
+  "horizon_td": 15,
+  "horizon_tw": 6,
+  "rows": [
+    {
+      "symbol": "ES",
+      "daily_status": "NONE",
+      "daily_core_start": null,
+      "daily_core_end": null,
+      "daily_median": null,
+      "days_to_core": null,
+      "weekly_status": "NONE",
+      "weekly_core_start": null,
+      "weekly_core_end": null,
+      "weekly_median": null,
+      "weeks_to_core": null,
+      "primary_astro": "2025-01-15 (T-7)",
+      "backup_astro": "2025-01-08 (T-2)",
+      "priority_score": 0
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "symbol": "ES",
+  "aliases": [],
+  "asof_td_label": "2025-12-24",
+  "asof_td_index": 17,
+  "asof_tw_index": 3,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 26,
+      "anchor": "2025-12-28"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 37,
+      "anchor": "2026-01-04"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "IN_WINDOW",
+      "prewindow_start": "2025-12-22",
+      "prewindow_end": "2025-12-23",
+      "core_start": "2025-12-24",
+      "core_end": "2026-01-01",
+      "median": "2025-12-29",
+      "days_to_core_start": 0
+    },
+    "WEEKLY": {
+      "status": "IN_WINDOW",
+      "prewindow_start": "2025-12-05",
+      "prewindow_end": "2025-12-12",
+      "core_start": "2025-12-19",
+      "core_end": "2026-01-30",
+      "median": "2026-01-09",
+      "weeks_to_core_start": 0
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": true,
+    "daily_core": "2025-12-24 \u2192 2026-01-01",
+    "weekly_core": "2025-12-19 \u2192 2026-01-30"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": null,
+      "scope": null,
+      "price_reference": null,
+      "bullets": [
+        "Still in a trading range, upside is capped \u2013 Weekly chart",
+        "AI plays are getting weaker, 2026 will likely be a lot different than 2025",
+        "A weekly cycle trough is due 12-1 \u2013 1/19",
+        "A downside zone is at $6668 \u2013 $6601, a move below would be cause for concern \u2013 Daily chart"
+      ],
+      "asof": "2025-12-19"
+    }
+  ],
+  "astro": {
+    "next_primary": {
+      "date": "2026-01-23",
+      "t_minus_td": 22,
+      "name": "Manual Entry",
+      "category": "REVERSAL",
+      "confidence": null
+    },
+    "backup_events": [
+      {
+        "date": "2026-01-03",
+        "t_minus_td": 8,
+        "name": "Secondary astro date",
+        "category": "REVERSAL",
+        "confidence": null
+      }
+    ]
+  }
+}

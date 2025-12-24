@@ -1,0 +1,69 @@
+{
+  "symbol": "NVDA",
+  "aliases": [],
+  "asof_td_label": "2025-12-19",
+  "asof_td_index": 14,
+  "asof_tw_index": 2,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 23,
+      "anchor": "2026-01-01"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 25,
+      "anchor": "2026-03-08"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE",
+      "prewindow_start": "2025-12-29",
+      "prewindow_end": "2025-12-29",
+      "core_start": "2025-12-30",
+      "core_end": "2026-01-05",
+      "median": "2026-01-01",
+      "days_to_core_start": 7
+    },
+    "WEEKLY": {
+      "status": "NONE",
+      "prewindow_start": "2026-02-20",
+      "prewindow_end": "2026-02-20",
+      "core_start": "2026-02-27",
+      "core_end": "2026-03-27",
+      "median": "2026-03-13",
+      "weeks_to_core_start": 10
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": false,
+    "daily_core": "2025-12-30 \u2192 2026-01-05",
+    "weekly_core": "2026-02-27 \u2192 2026-03-27"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "LEVELS",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Levels that decide whether 'AI rotation' is done",
+        "164 area (weekly cycle support) = the line in the sand",
+        "Hold + reclaim 179\u2013182 \u21d2 rotation is likely temporary; tradable daily-cycle bounce",
+        "Lose 164 with acceptance \u21d2 rotation isn't 'rotation' anymore; it's regime stress, opening 155 then ~142 (downside bands)"
+      ],
+      "asof": "2025-12-19"
+    }
+  ],
+  "astro": {
+    "next_primary": {
+      "date": "2026-01-02",
+      "t_minus_td": 10,
+      "name": "Primary astro window (start)",
+      "category": "REVERSAL",
+      "confidence": null
+    },
+    "backup_events": []
+  }
+}

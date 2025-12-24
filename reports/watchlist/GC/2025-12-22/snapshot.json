@@ -1,0 +1,68 @@
+{
+  "symbol": "GC",
+  "aliases": [],
+  "asof_td_label": "2025-12-22",
+  "asof_td_index": 15,
+  "asof_tw_index": 3,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 48,
+      "anchor": "2026-01-13"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 28,
+      "anchor": "2026-06-14"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE",
+      "prewindow_start": "2026-01-08",
+      "prewindow_end": "2026-01-08",
+      "core_start": "2026-01-09",
+      "core_end": "2026-01-15",
+      "median": "2026-01-13",
+      "days_to_core_start": 14
+    },
+    "WEEKLY": {
+      "status": "NONE",
+      "prewindow_start": "2026-05-29",
+      "prewindow_end": "2026-05-29",
+      "core_start": "2026-06-05",
+      "core_end": "2026-06-30",
+      "median": "2026-06-19",
+      "weeks_to_core_start": 23
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": false,
+    "daily_core": "2026-01-09 \u2192 2026-01-15",
+    "weekly_core": "2026-06-05 \u2192 2026-06-30"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Rising phase from the 11/03 low \u2013 Weekly chart",
+        "Ascending triangle forming\u2014 Weekly chart",
+        "No obvious set up right now but RS is positive, in a grind \u2013 Daily chart"
+      ],
+      "asof": "2025-12-19"
+    }
+  ],
+  "astro": {
+    "next_primary": {
+      "date": "2026-01-09",
+      "t_minus_td": 14,
+      "name": "Primary astro date",
+      "category": "REVERSAL",
+      "confidence": null
+    },
+    "backup_events": []
+  }
+}

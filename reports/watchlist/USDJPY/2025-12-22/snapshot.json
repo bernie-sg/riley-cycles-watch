@@ -1,0 +1,61 @@
+{
+  "symbol": "USDJPY",
+  "aliases": [],
+  "asof_td_label": "2025-12-22",
+  "asof_td_index": 35,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 64,
+      "anchor": "2026-02-26"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 23,
+      "anchor": "2026-03-15"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE",
+      "prewindow_start": "2026-02-23",
+      "prewindow_end": "2026-02-23",
+      "core_start": "2026-02-24",
+      "core_end": "2026-03-02",
+      "median": "2026-02-26",
+      "days_to_core_start": 46
+    },
+    "WEEKLY": {
+      "status": "NONE",
+      "prewindow_start": "2026-02-27",
+      "prewindow_end": "2026-02-27",
+      "core_start": "2026-03-06",
+      "core_end": "2026-04-03",
+      "median": "2026-03-20",
+      "weeks_to_core_start": 10
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": false,
+    "daily_core": "2026-02-24 \u2192 2026-03-02",
+    "weekly_core": "2026-03-06 \u2192 2026-04-03"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "LEVELS",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Intermediate bull flag intact; upside levels are at $157.00\u2013$158.46 with old high $158.96 \u2014 Weekly chart",
+        "Choppy; a push back above $157.00 would confirm the trough and target $157.80 \u2014 Daily chart"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

@@ -1,0 +1,263 @@
+================================================================================
+CALENDAR INTEGRATION INTO SIDEBAR "SELECT VIEW" - COMPLETE
+================================================================================
+
+Date: 2025-12-23
+Task: Add CALENDAR as third option to existing sidebar Select View menu
+Status: ✓ COMPLETE
+
+================================================================================
+CHANGES MADE
+================================================================================
+
+File: app/Home.py
+
+1. ADDED "CALENDAR" TO SELECT VIEW RADIO (Line 301-305)
+   --------------------------------------------------------
+   OLD:
+     view = st.sidebar.radio(
+         "Select View",
+         ["TODAY", "DATABASE"],
+         index=0
+     )
+
+   NEW:
+     view = st.sidebar.radio(
+         "Select View",
+         ["TODAY", "DATABASE", "CALENDAR"],
+         index=0
+     )
+
+2. ADDED ROUTING TO CALENDAR VIEW (Line 368-373)
+   --------------------------------------------------------
+   OLD:
+     if view == "TODAY":
+         render_today_view(latest_scan, filters, selected_instrument)
+     elif view == "DATABASE":
+         render_database_view()
+
+   NEW:
+     if view == "TODAY":
+         render_today_view(latest_scan, filters, selected_instrument)
+     elif view == "DATABASE":
+         render_database_view()
+     elif view == "CALENDAR":
+         render_calendar_view()
+
+3. IMPLEMENTED render_calendar_view() FUNCTION (Line 285-512)
+   --------------------------------------------------------
+   Complete 2-month calendar view with:
+   - Symbol filtering (multiselect)
+   - Toggle filters (DAILY/WEEKLY/OVERLAP/ASTRO)
+   - Debug info (collapsible)
+   - Event generation using calendar_events service
+   - Two rendering modes:
+     * Primary: streamlit-calendar (if available)
+     * Fallback: Custom HTML with FullCalendar CDN
+   - Legend showing color codes
+
+================================================================================
+IMPLEMENTATION DETAILS
+================================================================================
+
+render_calendar_view() Function:
+
+1. IMPORTS
+   - datetime, timedelta (date math)
+   - relativedelta (from dateutil)
+   - build_fullcalendar_events (event builder)
+   - get_available_symbols (symbol loader)
+
+2. FILTERS (in expander)
+   - Symbol multiselect (default: first 5)
+   - DAILY windows toggle
+   - WEEKLY windows toggle
+   - OVERLAP toggle
+   - Astro events toggle
+
+3. EVENT GENERATION
+   - Calls build_fullcalendar_events()
+   - Passes selected symbols + filter flags
+   - Handles errors gracefully
+
+4. CALENDAR RENDERING
+   Primary (streamlit-calendar):
+     - December 2025 grid
+     - January 2026 grid
+     - Custom CSS for styling
+
+   Fallback (HTML):
+     - FullCalendar 6.1.11 via CDN
+     - Two stacked calendars
+     - Same event data
+
+5. LEGEND
+   - Cycle windows: DAILY (blue), WEEKLY (purple), OVERLAP (amber)
+   - Astro events: PRIMARY (red), BACKUP (teal)
+
+================================================================================
+SIDEBAR FLOW
+================================================================================
+
+Navigation (Left Sidebar)
+├── Latest Scan: 22 Dec 2025
+├── Select View
+│   ◉ TODAY          ← Default
+│   ○ DATABASE
+│   ○ CALENDAR       ← NEW!
+├── Instrument Search (TODAY only)
+├── Filters
+│   └── Group, Sector, Status
+└── Refresh Data
+
+When user clicks CALENDAR:
+  1. Sidebar stays in place (no navigation change)
+  2. Main area renders render_calendar_view()
+  3. Shows 2-month calendar with filters
+  4. Displays cycle windows as multi-day bars
+
+================================================================================
+KEY FEATURES
+================================================================================
+
+✓ Integrated into existing sidebar (no multipage dependency)
+✓ Same navigation pattern as TODAY/DATABASE
+✓ Symbol filtering (select which instruments to show)
+✓ Toggle filters (DAILY/WEEKLY/OVERLAP/ASTRO)
+✓ Debug info for troubleshooting
+✓ Two-month view (current + next)
+✓ Multi-day spanning bars (FullCalendar)
+✓ Auto-fallback if streamlit-calendar unavailable
+✓ Legend showing color codes
+
+================================================================================
+CODE SNIPPETS (FOR REFERENCE)
+================================================================================
+
+1. Select View Radio (Line 301):
+```python
+view = st.sidebar.radio(
+    "Select View",
+    ["TODAY", "DATABASE", "CALENDAR"],
+    index=0
+)
+```
+
+2. View Router (Line 368):
+```python
+if view == "TODAY":
+    render_today_view(latest_scan, filters, selected_instrument)
+elif view == "DATABASE":
+    render_database_view()
+elif view == "CALENDAR":
+    render_calendar_view()
+```
+
+3. Calendar Function Header (Line 285):
+```python
+def render_calendar_view():
+    """Render CALENDAR view - 2-month cycle windows visualization"""
+```
+
+================================================================================
+VERIFICATION
+================================================================================
+
+To verify in browser:
+
+1. Navigate to http://localhost:8501
+
+2. Look at left sidebar "Select View"
+   Expected options:
+   - TODAY
+   - DATABASE  
+   - CALENDAR ← Should appear
+
+3. Click "CALENDAR"
+
+4. Should see:
+   - "📅 Calendar - This Month + Next Month" header
+   - Filters expander (symbols, toggles)
+   - Event count info
+   - December 2025 calendar grid
+   - January 2026 calendar grid
+   - Multi-day bars spanning across days
+   - Legend at bottom
+
+If errors:
+- Check browser console
+- Expand "Debug Info" to see events
+- Verify database path is correct
+
+================================================================================
+DEPENDENCIES
+================================================================================
+
+Required:
+- src.riley.calendar_events (build_fullcalendar_events, get_available_symbols)
+- python-dateutil (relativedelta)
+
+Optional:
+- streamlit-calendar (preferred renderer)
+- Falls back to HTML + FullCalendar CDN if unavailable
+
+================================================================================
+NO CHANGES TO
+================================================================================
+
+✓ Database
+✓ Calendar events logic
+✓ TODAY view
+✓ DATABASE view
+✓ Existing filters
+✓ Multipage pages/ directory (not used)
+
+================================================================================
+COMPARISON: MULTIPAGE vs SIDEBAR INTEGRATION
+================================================================================
+
+Multipage Approach (pages/Calendar.py):
+  - Requires Streamlit discovering pages/ directory
+  - Shows as separate page in sidebar
+  - Different navigation paradigm
+  - Bernard's app doesn't use this
+
+Sidebar Integration (THIS APPROACH):
+  ✓ Uses existing "Select View" pattern
+  ✓ Consistent with TODAY/DATABASE
+  ✓ No multipage dependency
+  ✓ Same left sidebar navigation
+  ✓ Matches Bernard's app design
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+For Bernard:
+1. Refresh browser at http://localhost:8501
+2. Click "CALENDAR" in Select View
+3. Select symbols to display
+4. Toggle filters as needed
+5. Verify multi-day bars span correctly
+6. Check legend for color meanings
+
+For development:
+- Optional: Add date range selector
+- Optional: Add export to ICS
+- Optional: Add event click handlers
+- Optional: Add desk notes in event details
+
+================================================================================
+CONCLUSION
+================================================================================
+
+✓ CALENDAR successfully integrated into existing sidebar
+✓ No Streamlit multipage required
+✓ Uses same navigation pattern as TODAY/DATABASE
+✓ Full functionality preserved
+✓ Automatic fallback rendering
+
+Calendar is now accessible via the same "Select View" menu Bernard uses
+for TODAY and DATABASE views. No changes to existing functionality.
+
+================================================================================

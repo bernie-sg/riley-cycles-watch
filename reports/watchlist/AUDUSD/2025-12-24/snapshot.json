@@ -1,0 +1,51 @@
+{
+  "symbol": "AUDUSD",
+  "aliases": [],
+  "asof_td_label": "2025-12-24",
+  "asof_td_index": 37,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 33,
+      "anchor": "2026-01-11"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 25,
+      "anchor": "2026-03-22"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE"
+    },
+    "WEEKLY": {
+      "status": "NONE",
+      "prewindow_start": "2026-01-23",
+      "prewindow_end": "2026-01-30",
+      "core_start": "2026-02-06",
+      "core_end": "2026-03-20",
+      "median": "2026-03-27",
+      "weeks_to_core_start": 6
+    }
+  },
+  "overlap": {},
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Longer-term trough due Feb, still a trading range \u2014 Weekly chart",
+        "Short-term trough due mid-Jan; first stall signs if below 21-EMA near $0.6600, support is at $0.6580\u2013$0.6520 \u2014 Daily chart"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

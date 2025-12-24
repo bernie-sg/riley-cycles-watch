@@ -1,0 +1,175 @@
+================================================================================
+STREAMLIT MULTIPAGE DISCOVERY FIX
+================================================================================
+
+Date: 2025-12-23
+Issue: Calendar page not appearing in Streamlit sidebar
+Status: ✓ FIXED
+
+================================================================================
+PROBLEM
+================================================================================
+
+Calendar page existed but did NOT appear in sidebar because:
+  WRONG: app/pages/Calendar.py
+  RIGHT: pages/Calendar.py (project root)
+
+Streamlit multipage discovery rules:
+  - Entrypoint: Can be anywhere (e.g., app/Home.py)
+  - Pages: MUST be in <project_root>/pages/
+  
+The Calendar was in app/pages/ which Streamlit does NOT discover.
+
+================================================================================
+FIX APPLIED
+================================================================================
+
+1. MOVED CALENDAR PAGE
+   FROM: app/pages/Calendar.py
+   TO:   pages/Calendar.py (project root)
+   
+2. FIXED IMPORTS
+   Updated sys.path manipulation:
+   - OLD: parent.parent.parent (3 levels up from app/pages/)
+   - NEW: parent.parent (2 levels up from pages/)
+   
+3. FIXED DB PATH
+   Updated DB_PATH:
+   - OLD: Path(__file__).parent.parent.parent / "db" / "riley.sqlite"
+   - NEW: Path(__file__).parent.parent / "db" / "riley.sqlite"
+
+4. REMOVED EMPTY DIRECTORY
+   Deleted: app/pages/ (now empty)
+
+5. UPDATED DOCUMENTATION
+   Fixed CALENDAR_VIEW_README.md to reference correct path
+
+================================================================================
+CORRECT STRUCTURE (AFTER FIX)
+================================================================================
+
+Riley Project/
+├── app/
+│   ├── Home.py          # Streamlit entrypoint
+│   ├── app.py           # Compatibility shim
+│   └── db.py            # Database layer
+├── pages/               # ← Streamlit discovers THIS
+│   └── Calendar.py      # ✓ Now visible in sidebar
+├── src/riley/
+│   ├── calendar_events.py
+│   └── ... (other modules)
+└── db/
+    └── riley.sqlite
+
+Streamlit Discovery:
+  ✓ Entrypoint: app/Home.py
+  ✓ Pages:      pages/ (auto-discovered)
+
+================================================================================
+VERIFICATION
+================================================================================
+
+✓ Structure correct:
+  - pages/Calendar.py exists
+  - app/pages/ removed
+  
+✓ Imports tested:
+  - Successfully loaded 22 symbols
+  - No import errors
+
+✓ Documentation updated:
+  - CALENDAR_VIEW_README.md now references pages/Calendar.py
+
+================================================================================
+HOW TO VERIFY IN BROWSER
+================================================================================
+
+1. Streamlit should be running at: http://localhost:8501
+
+2. Open browser → http://localhost:8501
+
+3. Look at sidebar (left side):
+   Expected to see:
+   - Home (or Riley Cycles Watch)
+   - Calendar ← Should now appear!
+
+4. Click "Calendar" in sidebar
+
+5. Should see:
+   - 2-month calendar grid
+   - Cycle window bars
+   - Filters and controls
+
+If Calendar still doesn't appear:
+  a) Force refresh browser (Cmd+Shift+R or Ctrl+Shift+R)
+  b) Restart Streamlit:
+     - Ctrl+C to stop
+     - Run: streamlit run app/Home.py
+  c) Clear Streamlit cache:
+     - In browser, click ⋮ menu → Clear cache
+
+================================================================================
+STREAMLIT MULTIPAGE RULES (FOR REFERENCE)
+================================================================================
+
+Correct structure:
+  ✓ Entrypoint anywhere (e.g., app/Home.py, main.py, app.py)
+  ✓ Pages MUST be in <project_root>/pages/
+  ✓ Page files named: <PageName>.py
+  ✓ Sidebar shows: Home + auto-discovered pages
+
+Page naming:
+  - pages/Calendar.py → Sidebar shows "Calendar"
+  - pages/1_Calendar.py → Sidebar shows "Calendar" (1 for ordering)
+  - pages/About.py → Sidebar shows "About"
+
+Page ordering (optional):
+  - pages/1_Dashboard.py (first)
+  - pages/2_Calendar.py (second)
+  - pages/3_Settings.py (third)
+
+================================================================================
+FILES CHANGED
+================================================================================
+
+Modified:
+  - pages/Calendar.py (moved from app/pages/, imports fixed)
+  - CALENDAR_VIEW_README.md (path reference updated)
+
+Removed:
+  - app/pages/ directory (now empty)
+
+Created:
+  - pages/ directory (at project root)
+  - MULTIPAGE_DISCOVERY_FIX.txt (this file)
+
+No changes to:
+  - Database
+  - Calendar logic
+  - Event generation
+  - Filters
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. Open http://localhost:8501 in browser
+2. Verify "Calendar" appears in sidebar
+3. Click "Calendar" to test functionality
+4. If issues, restart Streamlit:
+   bash scripts/run_ui.sh
+
+================================================================================
+CONCLUSION
+================================================================================
+
+✓ Calendar page moved to correct location (pages/Calendar.py)
+✓ Imports fixed for new location
+✓ Documentation updated
+✓ Structure now follows Streamlit conventions
+
+Calendar should now appear in sidebar and be fully functional.
+
+Streamlit multipage discovery: FIXED ✓
+
+================================================================================

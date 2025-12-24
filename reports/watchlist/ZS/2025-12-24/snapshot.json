@@ -1,0 +1,61 @@
+{
+  "symbol": "ZS",
+  "aliases": [],
+  "asof_td_label": "2025-12-24",
+  "asof_td_index": 37,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 43,
+      "anchor": "2026-02-02"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 19,
+      "anchor": "2026-01-11"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE",
+      "prewindow_start": "2025-12-29",
+      "prewindow_end": "2025-12-30",
+      "core_start": "2025-12-31",
+      "core_end": "2026-01-08",
+      "median": "2026-02-02",
+      "days_to_core_start": 5
+    },
+    "WEEKLY": {
+      "status": "IN_WINDOW",
+      "prewindow_start": "2025-11-14",
+      "prewindow_end": "2025-11-21",
+      "core_start": "2025-11-28",
+      "core_end": "2026-01-09",
+      "median": "2026-01-16",
+      "weeks_to_core_start": 0
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": true,
+    "daily_core": "2025-12-31 \u2192 2026-01-08",
+    "weekly_core": "2025-11-28 \u2192 2026-01-09"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "In a corrective phase with a 12/8\u20132/02 window \u2013 Weekly chart",
+        "Selling off after head-and-shoulders, rallies are likely to fail \u2014 Daily chart"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

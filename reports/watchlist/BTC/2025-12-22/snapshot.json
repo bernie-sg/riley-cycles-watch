@@ -1,0 +1,62 @@
+{
+  "symbol": "BTC",
+  "aliases": [],
+  "asof_td_label": "2025-12-22",
+  "asof_td_index": 35,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 48,
+      "anchor": "2026-01-12"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 17,
+      "anchor": "2025-12-28"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE",
+      "prewindow_start": "2026-01-07",
+      "prewindow_end": "2026-01-07",
+      "core_start": "2026-01-08",
+      "core_end": "2026-01-14",
+      "median": "2026-01-12",
+      "days_to_core_start": 13
+    },
+    "WEEKLY": {
+      "status": "IN_WINDOW",
+      "prewindow_start": "2025-12-12",
+      "prewindow_end": "2025-12-12",
+      "core_start": "2025-12-19",
+      "core_end": "2026-01-16",
+      "median": "2026-01-02",
+      "weeks_to_core_start": 0
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": true,
+    "daily_core": "2026-01-08 \u2192 2026-01-14",
+    "weekly_core": "2025-12-19 \u2192 2026-01-16"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "LEVELS",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Cycle low due 12/1\u20131/19, RS is still down \u2013 Weekly chart",
+        "Structure still looks like a pause in a downtrend while below $103,203 \u2014 Daily chart",
+        "A break of $85,365 would target the prior $81,450 low \u2014 Daily chart"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

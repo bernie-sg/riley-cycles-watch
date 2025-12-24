@@ -1,0 +1,61 @@
+{
+  "symbol": "ZC",
+  "aliases": [],
+  "asof_td_label": "2025-12-22",
+  "asof_td_index": 35,
+  "asof_tw_index": 7,
+  "cycle_specs": {
+    "DAILY": {
+      "version": 1,
+      "length": 33,
+      "anchor": "2026-01-04"
+    },
+    "WEEKLY": {
+      "version": 1,
+      "length": 25,
+      "anchor": "2026-02-08"
+    }
+  },
+  "cycle_proximity": {
+    "DAILY": {
+      "status": "NONE",
+      "prewindow_start": "2025-12-31",
+      "prewindow_end": "2025-12-31",
+      "core_start": "2026-01-01",
+      "core_end": "2026-01-07",
+      "median": "2026-01-05",
+      "days_to_core_start": 8
+    },
+    "WEEKLY": {
+      "status": "NONE",
+      "prewindow_start": "2026-01-23",
+      "prewindow_end": "2026-01-23",
+      "core_start": "2026-01-30",
+      "core_end": "2026-02-27",
+      "median": "2026-02-13",
+      "weeks_to_core_start": 5
+    }
+  },
+  "overlap": {
+    "daily_core_overlaps_weekly_core": false,
+    "daily_core": "2026-01-01 \u2192 2026-01-07",
+    "weekly_core": "2026-01-30 \u2192 2026-02-27"
+  },
+  "notes": [
+    {
+      "author": "Bernard",
+      "note_type": "SUMMARY",
+      "scope": "BOTH",
+      "price_reference": "OTHER",
+      "bullets": [
+        "Weekly rising mode with a higher low base forming",
+        "In a holding pattern \u2013 Daily chart"
+      ],
+      "asof": "2025-12-22"
+    }
+  ],
+  "astro": {
+    "next_primary": null,
+    "backup_events": []
+  }
+}

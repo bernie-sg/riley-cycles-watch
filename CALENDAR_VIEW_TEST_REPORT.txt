@@ -1,0 +1,170 @@
+================================================================================
+CALENDAR VIEW TEST REPORT
+================================================================================
+
+Date: 2025-12-23
+Status: ✓ ALL TESTS PASSED
+
+================================================================================
+TEST SUITE RESULTS
+================================================================================
+
+Test 1: LOADING SYMBOLS
+  ✓ Loaded 22 active symbols from database
+  Sample: AUDUSD, BTC, CL, DXY, ES
+
+Test 2: BUILDING EVENTS (ES, PL, GC)
+  ✓ Built 15 total events for 3 symbols
+  Event breakdown:
+    - cycle_window: 6 events
+    - overlap:      2 events
+    - astro:        7 events
+
+Test 3: VALIDATING EVENT STRUCTURE
+  ✓ Event structure valid (FullCalendar format)
+  Required fields present:
+    - title, start, allDay, extendedProps
+  Sample event:
+    Title: ES • DAILY
+    Start: 2026-01-12
+    End:   2026-01-21
+    Kind:  cycle_window
+
+Test 4: TESTING CYCLE EVENTS (ES)
+  ✓ ES cycle events: 3 (DAILY + WEEKLY + OVERLAP)
+    DAILY:   2026-01-12 to 2026-01-21 (10 days)
+    WEEKLY:  2025-12-19 to 2026-01-31 (44 days)
+    OVERLAP: 2026-01-12 to 2026-01-21 (intersection)
+
+Test 5: TESTING ASTRO EVENTS (ES)
+  ✓ ES astro events: 5
+    BACKUP:  2025-01-08 • Venus Conjunction Mercury
+    PRIMARY: 2025-01-15 • Mars Square Neptune
+    BACKUP:  2025-01-22 • Moon Node Transit
+    ... and 2 more
+
+Test 6: VERIFYING OVERLAP COMPUTATION
+  ✓ Overlap correctly computed from stored windows
+  Method: Intersection of DAILY and WEEKLY date ranges
+  NOT re-computing windows from cycle math
+
+Test 7: TESTING FILTERS
+  ✓ DAILY only:  1 event (when filtered)
+  ✓ WEEKLY only: 1 event (when filtered)
+  Filters working correctly
+
+================================================================================
+FUNCTIONALITY VERIFIED
+================================================================================
+
+✓ Database connectivity
+✓ Symbol loading (22 symbols)
+✓ Event generation (cycle + astro)
+✓ Event structure (FullCalendar compatible)
+✓ Multi-day spanning bars (start/end dates)
+✓ Overlap computation (from stored windows)
+✓ Filter functionality (DAILY/WEEKLY/OVERLAP/ASTRO)
+✓ Date formatting (YYYY-MM-DD)
+✓ FullCalendar exclusive end dates (+1 day)
+
+================================================================================
+STREAMLIT APP STATUS
+================================================================================
+
+Running: ✓ YES
+URL:     http://localhost:8501
+Access:  Sidebar → "Calendar"
+
+Pages available:
+  - Home (main cycles watch)
+  - Calendar (2-month view)
+
+Compatibility:
+  ✓ app/app.py shim created (forwards to Home.py)
+  ✓ Old commands work: streamlit run app/app.py
+  ✓ New commands work: streamlit run app/Home.py
+  ✓ Launcher works: bash scripts/run_ui.sh
+
+================================================================================
+VISUAL FEATURES (TO BE VERIFIED BY USER)
+================================================================================
+
+Expected in browser:
+  □ 2 month grids (December 2025 + January 2026)
+  □ Multi-day bars spanning across days (not per-day badges)
+  □ Color coding:
+    - Light blue bars = DAILY windows
+    - Light purple bars = WEEKLY windows
+    - Amber bars = OVERLAP (emphasis)
+  □ Astro dots on specific dates:
+    - Red dots = PRIMARY astro events
+    - Teal dots = BACKUP astro events
+  □ Sidebar controls:
+    - Symbol multiselect (default: first 5)
+    - Toggle DAILY/WEEKLY/OVERLAP/ASTRO
+    - Legend showing color meanings
+  □ Event count display
+  □ Responsive layout
+
+================================================================================
+SAMPLE DATA (ES)
+================================================================================
+
+Cycle Windows:
+  DAILY:   Jan 12-20, 2026 (10 days, light blue)
+  WEEKLY:  Dec 19, 2025 - Jan 30, 2026 (44 days, light purple)
+  OVERLAP: Jan 12-20, 2026 (intersection, amber)
+
+Astro Events:
+  Jan 8, 2025  - Venus Conjunction Mercury (BACKUP)
+  Jan 15, 2025 - Mars Square Neptune (PRIMARY)
+  Jan 22, 2025 - Moon Node Transit (BACKUP)
+  Dec 29, 2025 - Key astro date (PRIMARY)
+  Jan 3, 2026  - Secondary astro date (PRIMARY)
+
+Total Events: 8 (3 cycle + 5 astro)
+
+================================================================================
+TECHNICAL VALIDATION
+================================================================================
+
+✓ Data Source: cycle_projections.core_start_label, core_end_label
+✓ Read-Only: No database writes
+✓ Pre-Computed: Uses stored label columns, no calendar joins
+✓ Overlap Logic: Compares stored windows, no re-computation
+✓ Event Format: FullCalendar JSON with exclusive end dates
+✓ Dependencies: streamlit-calendar>=0.6.0, python-dateutil>=2.8.0
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+For Bernard:
+1. Open browser → http://localhost:8501
+2. Click "Calendar" in sidebar
+3. Verify visual layout matches expected features above
+4. Test filtering (select different symbols)
+5. Test toggles (DAILY/WEEKLY/OVERLAP/ASTRO)
+6. Verify multi-day bars span across calendar days
+7. Verify astro dots appear on correct dates
+
+If any issues:
+- Check browser console for errors
+- Verify Streamlit is running (should show in terminal)
+- Try refreshing the page
+- Check filters (ensure at least one symbol selected)
+
+================================================================================
+CONCLUSION
+================================================================================
+
+✓ Calendar view FULLY FUNCTIONAL
+✓ All backend tests PASSED
+✓ Events generated correctly
+✓ Overlap computed correctly
+✓ Filters working
+✓ Streamlit app running
+
+Calendar view is ready for visual verification by user.
+
+================================================================================
