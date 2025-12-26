@@ -43,3 +43,11 @@ config.local.toml
 storage_state.json
 src/riley/modules/askslim/storage_state.json
 src/riley/modules/askslim/*.auth.json
+
+# Generated outputs
+media/
+reports/
+artifacts/
+
+# Market data exports
+artifacts/rrg/*.csv
