@@ -8,3 +8,5 @@ ib-insync>=0.9.86
 streamlit>=1.28.0
 streamlit-calendar>=0.6.0
 python-dateutil>=2.8.0
+playwright>=1.40.0
+python-dotenv>=1.0.0

@@ -36,3 +36,10 @@ htmlcov/
 
 # Local config overrides
 config.local.toml
+
+# askSlim module secrets and session state
+.env
+*.auth.json
+storage_state.json
+src/riley/modules/askslim/storage_state.json
+src/riley/modules/askslim/*.auth.json
