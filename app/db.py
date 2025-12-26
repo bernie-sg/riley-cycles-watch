@@ -481,7 +481,7 @@ class CyclesDB:
         Get complete instrument data for editing.
 
         Returns:
-            - instrument: metadata (symbol, name, sector, active, aliases)
+            - instrument: metadata (symbol, name, instrument_type, sector, group_name, active, aliases)
             - daily_cycle: {median, bars, window_start, window_end}
             - weekly_cycle: {median, bars, window_start, window_end}
             - astro: {primary_date, backup_date}
@@ -492,7 +492,7 @@ class CyclesDB:
 
         # Get instrument metadata
         cursor.execute("""
-            SELECT instrument_id, symbol, name, sector, active, aliases
+            SELECT instrument_id, symbol, name, instrument_type, sector, active, aliases, group_name
             FROM instruments
             WHERE symbol = ? AND role = 'CANONICAL'
         """, (symbol,))
