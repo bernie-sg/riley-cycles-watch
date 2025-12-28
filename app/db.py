@@ -128,8 +128,6 @@ class CyclesDB:
             SELECT
                 i.symbol,
                 i.name,
-                i.group_name,
-                i.sector,
 
                 -- DAILY status (simple date comparison)
                 CASE
@@ -216,13 +214,15 @@ class CyclesDB:
         ]
 
         # Add filters
-        if filters.get('group_name'):
-            query += " AND i.group_name = ?"
-            params.append(filters['group_name'])
+        # Note: group_name column doesn't exist in current schema
+        # if filters.get('group_name'):
+        #     query += " AND i.group_name = ?"
+        #     params.append(filters['group_name'])
 
-        if filters.get('sector'):
-            query += " AND i.sector = ?"
-            params.append(filters['sector'])
+        # Note: sector column doesn't exist in current schema
+        # if filters.get('sector'):
+        #     query += " AND i.sector = ?"
+        #     params.append(filters['sector'])
 
         # Status filter
         status_filter_applied = False
@@ -239,7 +239,7 @@ class CyclesDB:
                 status_filter_applied = True
 
         # Order and limit
-        query += " ORDER BY i.sort_key, i.symbol LIMIT 50"
+        query += " ORDER BY i.symbol LIMIT 50"
 
         df = pd.read_sql_query(query, conn, params=params)
         conn.close()
@@ -267,12 +267,14 @@ class CyclesDB:
 
         instrument_id = instrument['instrument_id']
 
-        # Get cycle specs with stored dates
+        # Get cycle specs with stored dates and key levels
         cursor.execute("""
             SELECT
                 cs.timeframe,
                 cs.median_input_date_label,
                 cs.cycle_length_bars,
+                cs.support_level,
+                cs.resistance_level,
                 cp.median_label,
                 cp.core_start_label as window_start_date,
                 cp.core_end_label as window_end_date,
@@ -288,6 +290,17 @@ class CyclesDB:
             ORDER BY cs.timeframe DESC
         """, (instrument_id,))
         cycle_specs = [dict(row) for row in cursor.fetchall()]
+
+        # Get instrument analysis (directional bias and video URL)
+        cursor.execute("""
+            SELECT directional_bias, video_url
+            FROM instrument_analysis
+            WHERE instrument_id = ? AND status = 'ACTIVE'
+            ORDER BY version DESC
+            LIMIT 1
+        """, (instrument_id,))
+        analysis_row = cursor.fetchone()
+        analysis = dict(analysis_row) if analysis_row else {'directional_bias': None, 'video_url': None}
 
         # Compute simple status
         scan_row = {}
@@ -358,7 +371,8 @@ class CyclesDB:
             'scan_row': scan_row,
             'notes': notes,
             'astro_events': astro_events,
-            'cycle_specs': cycle_specs
+            'cycle_specs': cycle_specs,
+            'analysis': analysis
         }
 
     def get_countdown_rows(self, scan_date: str, horizon_days: int = 30) -> pd.DataFrame:
@@ -378,11 +392,7 @@ class CyclesDB:
                 role,
                 canonical_symbol,
                 active,
-                instrument_type,
-                group_name,
-                sector,
-                sort_key,
-                aliases
+                notes as aliases
             FROM instruments
             WHERE 1=1
         """
@@ -392,15 +402,16 @@ class CyclesDB:
         if filters.get('active_only'):
             query += " AND active = 1"
 
-        if filters.get('group_name'):
-            query += " AND group_name = ?"
-            params.append(filters['group_name'])
+        # Note: group_name, sector, and other taxonomy columns don't exist in current schema
+        # if filters.get('group_name'):
+        #     query += " AND group_name = ?"
+        #     params.append(filters['group_name'])
 
-        if filters.get('sector'):
-            query += " AND sector = ?"
-            params.append(filters['sector'])
+        # if filters.get('sector'):
+        #     query += " AND sector = ?"
+        #     params.append(filters['sector'])
 
-        query += " ORDER BY role, group_name, sector, sort_key, symbol"
+        query += " ORDER BY role, symbol"
 
         df = pd.read_sql_query(query, conn, params=params)
         conn.close()
@@ -411,7 +422,8 @@ class CyclesDB:
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        allowed_fields = ['instrument_type', 'group_name', 'sector', 'sort_key', 'active', 'aliases']
+        # Note: Only active and notes exist in current schema
+        allowed_fields = ['active', 'notes']
 
         set_clause = []
         params = []
@@ -438,8 +450,12 @@ class CyclesDB:
         """Get distinct group names"""
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT group_name FROM instruments ORDER BY group_name")
-        groups = [row[0] for row in cursor.fetchall()]
+        try:
+            cursor.execute("SELECT DISTINCT group_name FROM instruments WHERE group_name IS NOT NULL ORDER BY group_name")
+            groups = [row[0] for row in cursor.fetchall()]
+        except:
+            # Column doesn't exist, return empty list
+            groups = []
         conn.close()
         return groups
 
@@ -447,8 +463,12 @@ class CyclesDB:
         """Get distinct sectors"""
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT DISTINCT sector FROM instruments ORDER BY sector")
-        sectors = [row[0] for row in cursor.fetchall()]
+        try:
+            cursor.execute("SELECT DISTINCT sector FROM instruments WHERE sector IS NOT NULL ORDER BY sector")
+            sectors = [row[0] for row in cursor.fetchall()]
+        except:
+            # Column doesn't exist, return empty list
+            sectors = []
         conn.close()
         return sectors
 
@@ -481,7 +501,7 @@ class CyclesDB:
         Get complete instrument data for editing.
 
         Returns:
-            - instrument: metadata (symbol, name, instrument_type, sector, group_name, active, aliases)
+            - instrument: metadata (symbol, name, active, notes)
             - daily_cycle: {median, bars, window_start, window_end}
             - weekly_cycle: {median, bars, window_start, window_end}
             - astro: {primary_date, backup_date}
@@ -492,7 +512,7 @@ class CyclesDB:
 
         # Get instrument metadata
         cursor.execute("""
-            SELECT instrument_id, symbol, name, instrument_type, sector, active, aliases, group_name
+            SELECT instrument_id, symbol, name, active, notes
             FROM instruments
             WHERE symbol = ? AND role = 'CANONICAL'
         """, (symbol,))

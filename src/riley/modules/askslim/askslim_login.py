@@ -157,7 +157,14 @@ def perform_login():
 
             # Wait for navigation after login
             print("Waiting for login to complete...")
-            page.wait_for_load_state("networkidle", timeout=15000)
+            print("⏳ Pausing 5 seconds for login to process...")
+            page.wait_for_timeout(5000)  # Wait 5 seconds for login to process
+
+            # Now wait for network to settle
+            try:
+                page.wait_for_load_state("networkidle", timeout=15000)
+            except PlaywrightTimeout:
+                print("⚠ Network didn't settle, continuing anyway...")
 
             print(f"Current URL after login attempt: {page.url}")
 
@@ -165,14 +172,17 @@ def perform_login():
             # Check URL first - WordPress often redirects to wp-admin or member areas
             is_logged_in = False
 
-            if "/wp-admin" in page.url or "/futures-hub" in page.url:
+            if "/wp-admin" in page.url or "/futures-hub" in page.url or "/my-feed" in page.url:
                 print(f"✓ Login successful! Redirected to: {page.url}")
                 is_logged_in = True
+            elif "wp-login.php" not in page.url:
+                # We're not on login page anymore - likely logged in
+                print(f"✓ Login successful! Navigated away from login page to: {page.url}")
+                is_logged_in = True
             elif "wp-login.php" in page.url:
-                # Still on login page - check for error messages
-                print("⚠ Still on login page - checking for errors...")
-                is_logged_in = False
-            else:
+                # Still on login page - check for logged-in indicators more thoroughly
+                print("⚠ Still on login page - checking for logged-in indicators...")
+
                 # Look for common logged-in indicators on the page
                 logged_in_indicators = [
                     "text=Logout",
@@ -185,12 +195,13 @@ def perform_login():
                     "a[href*='wp-admin']",
                     ".user-menu",
                     ".logged-in",
-                    "#wpadminbar"  # WordPress admin bar
+                    "#wpadminbar",  # WordPress admin bar
+                    "text=Dashboard"
                 ]
 
                 for indicator in logged_in_indicators:
                     try:
-                        element = page.wait_for_selector(indicator, timeout=5000)
+                        element = page.wait_for_selector(indicator, timeout=2000)
                         if element:
                             print(f"✓ Login successful! Found indicator: {indicator}")
                             is_logged_in = True

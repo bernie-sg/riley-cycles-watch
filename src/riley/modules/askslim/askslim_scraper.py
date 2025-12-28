@@ -749,8 +749,13 @@ def scrape_instrument(page, askslim_symbol, iframe):
         return None
 
 
-def run_scraper():
-    """Run the complete scraper."""
+def run_scraper(headless=True):
+    """
+    Run the complete scraper.
+
+    Args:
+        headless: Run browser in headless mode (default True for automation)
+    """
     storage_state_path = Path(ASKSLIM_STORAGE_STATE_PATH)
 
     if not storage_state_path.exists():
@@ -763,10 +768,11 @@ def run_scraper():
     print(f"Database: {DB_PATH}")
     print(f"Media folder: {MEDIA_PATH}")
     print(f"Instruments to scrape: {len(ASKSLIM_TO_RILEY)}")
+    print(f"Headless mode: {headless}")
     print("="*70)
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=ASKSLIM_HEADLESS, slow_mo=200)
+        browser = p.chromium.launch(headless=headless, slow_mo=200)
         context = browser.new_context(
             storage_state=str(storage_state_path),
             viewport={'width': 1920, 'height': 1080}

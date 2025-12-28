@@ -2,9 +2,6 @@
 """
 askSlim Daily Run
 Daily job to scrape askSlim data and update Riley database.
-
-Phase 1: Stub implementation - just verifies session is valid.
-Phase 2: Will implement actual scraping and DB updates.
 """
 
 import sys
@@ -12,23 +9,24 @@ from pathlib import Path
 
 # Import our modules
 from src.riley.modules.askslim.askslim_smoketest import verify_session
+from src.riley.modules.askslim.askslim_scraper import run_scraper
 
 
 def run_daily_scrape():
     """
     Run the daily scraping job.
 
-    Phase 1: Just verify session is valid.
-    Phase 2: Will scrape data and update database.
+    1. Verify session is still valid
+    2. Run the askSlim scraper to get cycle data
     """
     print("="*60)
-    print("askSlim Daily Run - Phase 1")
+    print("askSlim Daily Run - Complete Scrape")
     print("="*60)
 
     # Verify session is still valid
     print("\n1. Verifying session state...")
     try:
-        is_valid = verify_session()
+        is_valid = verify_session(headless=True)
         if not is_valid:
             print("✗ Session is invalid - please run askslim_login.py")
             return False
@@ -42,20 +40,24 @@ def run_daily_scrape():
 
     print("✓ Session is valid")
 
-    # Phase 2 placeholder
-    print("\n2. Scraping data...")
-    print("⚠ Phase 2: scraping not implemented yet")
-    print("   This is where we will:")
-    print("   - Navigate to askSlim pages")
-    print("   - Extract cycle data")
-    print("   - Parse dates and cycle lengths")
-    print("   - Update Riley database")
+    # Run the actual scraper
+    print("\n2. Running askSlim scraper...")
+    print("   This will:")
+    print("   - Navigate to Futures Hub and Equities Hub")
+    print("   - Extract cycle data for all instruments")
+    print("   - Download cycle charts")
+    print("   - Update Riley database with cycle specs")
+    print("")
 
-    print("\n3. Updating database...")
-    print("⚠ Phase 2: database updates not implemented yet")
+    try:
+        run_scraper(headless=True)
+        print("\n✓ Scraping completed successfully")
+    except Exception as e:
+        print(f"\n✗ Scraping failed: {e}")
+        return False
 
     print("\n" + "="*60)
-    print("Daily run completed (Phase 1 - verification only)")
+    print("Daily run completed successfully")
     print("="*60)
 
     return True

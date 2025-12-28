@@ -246,6 +246,20 @@ def render_instrument_detail(symbol: str, scan_date: str):
     col1, col2 = st.columns(2)
 
     with col1:
+        # Analysis section - Directional Bias and Video
+        analysis = detail.get('analysis', {})
+        if analysis and analysis.get('directional_bias'):
+            bias = analysis['directional_bias']
+            bias_color = "#d1e7dd" if bias == "Bullish" else "#f8d7da" if bias == "Bearish" else "#fff3cd"
+            bias_text_color = "#0f5132" if bias == "Bullish" else "#842029" if bias == "Bearish" else "#997404"
+
+            st.markdown(f"### {bias} Bias")
+
+            if analysis.get('video_url'):
+                st.markdown(f"[📹 Watch Video Analysis]({analysis['video_url']})")
+
+            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
         # Cycles section - DISPLAY DB VALUES ONLY
         st.markdown("### Cycles")
         if detail['cycle_specs']:
@@ -259,18 +273,23 @@ def render_instrument_detail(symbol: str, scan_date: str):
                 start = weekly_spec.get('window_start_date')
                 end = weekly_spec.get('window_end_date')
                 bars = weekly_spec.get('cycle_length_bars')
+                support = weekly_spec.get('support_level')
+                resistance = weekly_spec.get('resistance_level')
 
                 weekly_trough = format_date(median) if median else '—'
                 weekly_start_fmt = format_date(start) if start else '—'
                 weekly_end_fmt = format_date(end) if end else '—'
                 weekly_bars_fmt = fmt(bars)
+                weekly_support_fmt = fmt(support) if support else '—'
+                weekly_resistance_fmt = fmt(resistance) if resistance else '—'
 
                 st.markdown(
                     f"""
 **WEEKLY**<br>
 Trough Date: {weekly_trough}<br>
 Window: {weekly_start_fmt} → {weekly_end_fmt}<br>
-Bars: {weekly_bars_fmt}
+Bars: {weekly_bars_fmt}<br>
+Support: {weekly_support_fmt} | Resistance: {weekly_resistance_fmt}
 """.strip(),
                     unsafe_allow_html=True
                 )
@@ -284,18 +303,23 @@ Bars: {weekly_bars_fmt}
                 start = daily_spec.get('window_start_date')
                 end = daily_spec.get('window_end_date')
                 bars = daily_spec.get('cycle_length_bars')
+                support = daily_spec.get('support_level')
+                resistance = daily_spec.get('resistance_level')
 
                 daily_trough = format_date(median) if median else '—'
                 daily_start_fmt = format_date(start) if start else '—'
                 daily_end_fmt = format_date(end) if end else '—'
                 daily_bars_fmt = fmt(bars)
+                daily_support_fmt = fmt(support) if support else '—'
+                daily_resistance_fmt = fmt(resistance) if resistance else '—'
 
                 st.markdown(
                     f"""
 **DAILY**<br>
 Trough Date: {daily_trough}<br>
 Window: {daily_start_fmt} → {daily_end_fmt}<br>
-Bars: {daily_bars_fmt}
+Bars: {daily_bars_fmt}<br>
+Support: {daily_support_fmt} | Resistance: {daily_resistance_fmt}
 """.strip(),
                     unsafe_allow_html=True
                 )
@@ -1138,6 +1162,445 @@ def render_calendar_view():
         """)
 
 
+def render_rrg_view():
+    """Render RRG Sector Rotation Map view"""
+    st.header("RRG - Sector Rotation Map")
+    st.caption("Relative Rotation Graph for US Sector ETFs")
+
+    # Import RRG components
+    try:
+        # Add sector-rotation-map to path
+        rrg_path = Path(__file__).parent.parent / "sector-rotation-map"
+        if str(rrg_path) not in sys.path:
+            sys.path.insert(0, str(rrg_path))
+
+        # Add src to path for riley modules
+        src_path = Path(__file__).parent.parent / "src"
+        if str(src_path) not in sys.path:
+            sys.path.insert(0, str(src_path))
+
+        from rrg.compute import compute_rrg_metrics
+        from rrg.chart import create_rrg_chart
+        from rrg.constants import DEFAULT_PARAMS, US_SECTORS
+
+        # Import market data module
+        from riley.modules.marketdata.store import get_db_path
+        from riley.modules.marketdata.export_rrg import get_export_stats
+
+    except ImportError as e:
+        st.error(f"Failed to import RRG modules: {e}")
+        st.info("Make sure the sector-rotation-map module is available")
+        return
+
+    # Check if market data exists
+    try:
+        stats = get_export_stats()
+
+        if stats['total_bars'] == 0:
+            st.warning("No market data available yet")
+            st.info("To collect market data, run:\n```bash\npython3 scripts/riley_marketdata.py backfill --lookback-days 730\n```")
+            return
+
+        # Display data stats
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Symbols", stats['total_symbols'])
+        with col2:
+            st.metric("Total Bars", f"{stats['total_bars']:,}")
+        with col3:
+            date_range = stats['date_range']
+            # Format dates as "24 Dec 2025"
+            min_date = pd.to_datetime(date_range['min']).strftime('%d %b %Y')
+            max_date = pd.to_datetime(date_range['max']).strftime('%d %b %Y')
+            st.metric("Date Range", f"{min_date} to {max_date}")
+
+        st.divider()
+
+        # Sidebar controls
+        st.sidebar.divider()
+        st.sidebar.subheader("RRG Controls")
+
+        # Sector Selection
+        with st.sidebar.expander("Select Sectors", expanded=True):
+            select_all = st.checkbox("Select All", value=True)
+
+            sector_list = list(US_SECTORS.keys())
+            if select_all:
+                selected_sectors = st.multiselect(
+                    "Sectors to Display",
+                    options=sector_list,
+                    default=sector_list,
+                    help="Choose which sectors to display on the chart"
+                )
+            else:
+                selected_sectors = st.multiselect(
+                    "Sectors to Display",
+                    options=sector_list,
+                    default=[],
+                    help="Choose which sectors to display on the chart"
+                )
+
+        # Quick Select Presets
+        st.sidebar.divider()
+        st.sidebar.subheader("Quick Select Groups")
+
+        preset_groups = {
+            "📈 Stock Sectors": "XLK,XLY,XLC,XLV,XLF,XLE,XLI,XLP,XLU,XLB,XLRE",
+            "🥇 Commodities": "GC=F,SI=F,CL=F,NG=F,HG=F,PL=F,ZC=F,ZW=F,ZS=F",
+            "💎 Precious Metals": "GLD,SLV,GC=F,SI=F,PALL,PPLT",
+            "⛽ Energy": "USO,UNG,CL=F,NG=F,XLE,OIH",
+            "🌾 Agriculture": "CORN,WEAT,SOYB,ZC=F,ZW=F,ZS=F,DBA",
+            "🏦 Major Indices": "SPY,QQQ,DIA,IWM,VTI",
+            "🌍 International": "EWJ,EWG,EWU,EWC,EWA,FXI,EWZ",
+            "₿ Crypto": "BTC-USD,ETH-USD,BNB-USD,SOL-USD,ADA-USD"
+        }
+
+        cols = st.sidebar.columns(2)
+        preset_selected = None
+        for idx, (name, symbols) in enumerate(preset_groups.items()):
+            col = cols[idx % 2]
+            if col.button(name, use_container_width=True, key=f"preset_{idx}"):
+                preset_selected = symbols
+
+        # Custom instruments input
+        if preset_selected:
+            custom_symbols_input = st.sidebar.text_input(
+                "Custom Instruments (comma-separated)",
+                value=preset_selected,
+                help="Enter stock symbols separated by commas to add to the chart"
+            )
+            # Auto-switch to Absolute mode for commodities
+            if "Commodities" in [k for k, v in preset_groups.items() if v == preset_selected][0]:
+                st.sidebar.info("💡 Tip: Select 'Absolute' benchmark below for commodity analysis")
+        else:
+            custom_symbols_input = st.sidebar.text_input(
+                "Custom Instruments (comma-separated)",
+                placeholder="e.g., AAPL, MSFT, NVDA",
+                help="Enter stock symbols separated by commas to add to the chart"
+            )
+
+        # Parse custom symbols
+        custom_symbols = []
+        if custom_symbols_input:
+            custom_symbols = [s.strip().upper() for s in custom_symbols_input.split(',') if s.strip()]
+            if custom_symbols:
+                st.sidebar.caption(f"Adding: {', '.join(custom_symbols)}")
+
+        # Benchmark selection
+        st.sidebar.divider()
+        benchmark_options = ['SPY (S&P 500)', 'QQQ (Nasdaq)', 'DIA (Dow)', 'IWM (Russell 2000)', '--- Absolute (No Benchmark) ---'] + custom_symbols
+        benchmark_choice = st.sidebar.selectbox(
+            "Benchmark Symbol",
+            options=benchmark_options,
+            index=0,
+            help="Symbol to use as benchmark for relative strength calculations. Select 'Absolute' to show pure momentum without comparison."
+        )
+
+        # Parse benchmark choice
+        if 'Absolute' in benchmark_choice:
+            benchmark_symbol = None  # No benchmark - absolute mode
+            st.sidebar.caption("📊 Absolute mode: Showing pure momentum")
+        else:
+            benchmark_symbol = benchmark_choice.split('(')[0].strip()  # Extract ticker from display name
+
+        # Zoom level control
+        zoom_level = st.sidebar.select_slider(
+            "Default Zoom Level",
+            options=["Tight", "Normal", "Wide", "Auto"],
+            value="Wide",
+            help="Tight = Zoomed in close, Wide = Zoomed out more, Auto = Fits all data"
+        )
+
+        # Tail length control
+        tail_weeks = st.sidebar.slider(
+            "Tail Length (weeks)",
+            min_value=1,
+            max_value=12,
+            value=1,  # Default to 1 week
+            help="Number of weeks to show in historical tails"
+        )
+
+        # Parameters
+        with st.sidebar.expander("Advanced Parameters", expanded=False):
+            rs_smoothing = st.number_input(
+                "RS Smoothing",
+                min_value=1,
+                max_value=50,
+                value=DEFAULT_PARAMS['rs_smoothing'],
+                help="EMA period for relative strength smoothing"
+            )
+
+            ratio_lookback = st.number_input(
+                "RS-Ratio Lookback",
+                min_value=1,
+                max_value=50,
+                value=DEFAULT_PARAMS['ratio_lookback'],
+                help="SMA period for RS-Ratio calculation"
+            )
+
+            momentum_lookback = st.number_input(
+                "RS-Momentum Lookback",
+                min_value=1,
+                max_value=50,
+                value=DEFAULT_PARAMS['momentum_lookback'],
+                help="SMA period for RS-Momentum calculation"
+            )
+
+        with st.sidebar.expander("Display Options", expanded=True):
+            show_tails = st.checkbox("Show Historical Tails", value=True)
+            show_labels = st.checkbox("Show Symbol Labels", value=True)
+
+        # Load data from database
+        import sqlite3
+        db_path = get_db_path()
+
+        query = """
+            SELECT date, symbol, open, high, low, close, volume
+            FROM price_bars_daily
+            ORDER BY date, symbol
+        """
+
+        conn = sqlite3.connect(str(db_path))
+        df_raw = pd.read_sql_query(query, conn)
+        conn.close()
+
+        if df_raw.empty:
+            st.error("No price data found in database")
+            return
+
+        # Convert date column
+        df_raw['date'] = pd.to_datetime(df_raw['date'])
+
+        # Fetch custom symbols if provided
+        if custom_symbols:
+            with st.spinner(f"Fetching data for {', '.join(custom_symbols)}..."):
+                import yfinance as yf
+                from datetime import timedelta
+
+                # Get date range from existing data
+                if not df_raw.empty:
+                    start_date = df_raw['date'].min()
+                    end_date_fetch = df_raw['date'].max() + timedelta(days=1)
+                else:
+                    # Default to 2 years if no data
+                    end_date_fetch = pd.Timestamp.now()
+                    start_date = end_date_fetch - timedelta(days=730)
+
+                custom_data = []
+                for symbol in custom_symbols:
+                    try:
+                        # Check if symbol already exists in database
+                        existing_symbol_data = df_raw[df_raw['symbol'] == symbol]
+
+                        if not existing_symbol_data.empty:
+                            # Symbol exists - only fetch new data after last date
+                            last_date = existing_symbol_data['date'].max()
+                            fetch_start = last_date + timedelta(days=1)
+                            st.sidebar.caption(f"📊 {symbol}: Updating from {fetch_start.strftime('%Y-%m-%d')}")
+                        else:
+                            # New symbol - fetch full history
+                            fetch_start = start_date
+                            st.sidebar.caption(f"📥 {symbol}: Downloading full history")
+
+                        ticker = yf.Ticker(symbol)
+                        hist = ticker.history(start=fetch_start, end=end_date_fetch)
+
+                        if not hist.empty:
+                            hist_reset = hist.reset_index()
+                            hist_reset['symbol'] = symbol
+                            hist_reset = hist_reset.rename(columns={
+                                'Date': 'date',
+                                'Open': 'open',
+                                'High': 'high',
+                                'Low': 'low',
+                                'Close': 'close',
+                                'Volume': 'volume'
+                            })
+                            # Strip timezone to match database data (tz-naive)
+                            hist_reset['date'] = pd.to_datetime(hist_reset['date']).dt.tz_localize(None)
+                            custom_data.append(hist_reset[['date', 'symbol', 'open', 'high', 'low', 'close', 'volume']])
+                    except Exception as e:
+                        st.sidebar.warning(f"⚠️ Could not fetch {symbol}: {str(e)[:100]}")
+
+                if custom_data:
+                    df_custom = pd.concat(custom_data, ignore_index=True)
+                    df_raw = pd.concat([df_raw, df_custom], ignore_index=True)
+
+        # Ensure benchmark symbol data is available
+        if benchmark_symbol is None:
+            # Absolute mode - create synthetic flat benchmark
+            if not df_raw.empty:
+                unique_dates = df_raw['date'].unique()
+                benchmark_data = pd.DataFrame({
+                    'date': unique_dates,
+                    'symbol': '__ABSOLUTE__',
+                    'open': 100.0,
+                    'high': 100.0,
+                    'low': 100.0,
+                    'close': 100.0,
+                    'volume': 0
+                })
+                df_raw = pd.concat([df_raw, benchmark_data], ignore_index=True)
+                benchmark_symbol = '__ABSOLUTE__'
+        elif benchmark_symbol not in df_raw['symbol'].unique():
+            with st.spinner(f"Fetching benchmark data for {benchmark_symbol}..."):
+                import yfinance as yf
+                from datetime import timedelta
+
+                if not df_raw.empty:
+                    start_date = df_raw['date'].min()
+                    end_date_fetch = df_raw['date'].max() + timedelta(days=1)
+                else:
+                    end_date_fetch = pd.Timestamp.now()
+                    start_date = end_date_fetch - timedelta(days=730)
+
+                try:
+                    ticker = yf.Ticker(benchmark_symbol)
+                    hist = ticker.history(start=start_date, end=end_date_fetch)
+                    if not hist.empty:
+                        hist_reset = hist.reset_index()
+                        hist_reset['symbol'] = benchmark_symbol
+                        hist_reset = hist_reset.rename(columns={
+                            'Date': 'date',
+                            'Open': 'open',
+                            'High': 'high',
+                            'Low': 'low',
+                            'Close': 'close',
+                            'Volume': 'volume'
+                        })
+                        hist_reset['date'] = pd.to_datetime(hist_reset['date']).dt.tz_localize(None)
+                        benchmark_data = hist_reset[['date', 'symbol', 'open', 'high', 'low', 'close', 'volume']]
+                        df_raw = pd.concat([df_raw, benchmark_data], ignore_index=True)
+                except Exception as e:
+                    st.error(f"Could not fetch benchmark {benchmark_symbol}: {str(e)}")
+                    return
+
+        # Compute RRG metrics
+        with st.spinner("Computing RRG metrics..."):
+            df_processed = compute_rrg_metrics(
+                df_raw,
+                benchmark_symbol=benchmark_symbol,
+                rs_smoothing=rs_smoothing,
+                ratio_lookback=ratio_lookback,
+                momentum_lookback=momentum_lookback
+            )
+
+        # Get unique symbols and end date
+        all_symbols = [s for s in df_processed['symbol'].unique() if s != benchmark_symbol]
+
+        # Filter to selected sectors and add custom symbols
+        if selected_sectors:
+            symbols = [s for s in all_symbols if s in selected_sectors]
+        else:
+            symbols = []
+
+        # Add custom symbols to display list
+        symbols.extend([s for s in custom_symbols if s in all_symbols])
+
+        if not symbols:
+            st.warning("No sectors or symbols selected. Please select at least one.")
+            return
+
+        end_date = df_processed['date'].max()
+
+        # Get benchmark price and name for title
+        if benchmark_symbol == '__ABSOLUTE__':
+            benchmark_price = None
+            benchmark_display_name = 'Absolute Mode'
+        else:
+            benchmark_data = df_processed[
+                (df_processed['symbol'] == benchmark_symbol) &
+                (df_processed['date'] == end_date)
+            ]
+            benchmark_price = benchmark_data['close'].iloc[0] if not benchmark_data.empty else None
+            benchmark_display_name = benchmark_symbol
+
+        # Filter data for visualization
+        df_filtered = df_processed[df_processed['symbol'].isin(symbols + [benchmark_symbol])].copy()
+
+        # Create RRG chart
+        fig = create_rrg_chart(
+            df_filtered,
+            symbols=symbols,
+            end_date=end_date,
+            tail_weeks=tail_weeks,
+            show_tails=show_tails,
+            show_labels=show_labels,
+            benchmark_symbol=benchmark_display_name,
+            benchmark_price=benchmark_price,
+            zoom_level=zoom_level
+        )
+
+        # Display chart with zoom/pan enabled
+        config = {
+            'displayModeBar': True,
+            'modeBarButtonsToAdd': ['zoom2d', 'pan2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d'],
+            'scrollZoom': True
+        }
+        st.plotly_chart(fig, use_container_width=True, config=config)
+
+        st.divider()
+
+        # Show sector table with current positions
+        st.subheader("Current Sector Positions")
+
+        latest_data = df_processed[df_processed['date'] == end_date].copy()
+        latest_data = latest_data[latest_data['symbol'].isin(symbols)]
+
+        # Add sector names
+        latest_data['sector_name'] = latest_data['symbol'].map(US_SECTORS)
+
+        # Determine quadrant
+        def get_quadrant(row):
+            if row['rs_ratio'] >= 100 and row['rs_momentum'] >= 100:
+                return '🟢 Leading'
+            elif row['rs_ratio'] < 100 and row['rs_momentum'] >= 100:
+                return '🔵 Improving'
+            elif row['rs_ratio'] < 100 and row['rs_momentum'] < 100:
+                return '🟡 Lagging'
+            else:
+                return '🔴 Weakening'
+
+        latest_data['quadrant'] = latest_data.apply(get_quadrant, axis=1)
+
+        # Format display
+        display_df = latest_data[['symbol', 'sector_name', 'rs_ratio', 'rs_momentum', 'quadrant']].copy()
+        display_df = display_df.rename(columns={
+            'symbol': 'Symbol',
+            'sector_name': 'Sector',
+            'rs_ratio': 'RS-Ratio',
+            'rs_momentum': 'RS-Momentum',
+            'quadrant': 'Quadrant'
+        })
+
+        # Sort by quadrant then RS-Ratio
+        quadrant_order = {'🟢 Leading': 1, '🔵 Improving': 2, '🔴 Weakening': 3, '🟡 Lagging': 4}
+        display_df['sort_order'] = display_df['Quadrant'].map(quadrant_order)
+        display_df = display_df.sort_values(['sort_order', 'RS-Ratio'], ascending=[True, False])
+        display_df = display_df.drop('sort_order', axis=1)
+
+        # Format numbers
+        display_df['RS-Ratio'] = display_df['RS-Ratio'].apply(lambda x: f"{x:.2f}")
+        display_df['RS-Momentum'] = display_df['RS-Momentum'].apply(lambda x: f"{x:.2f}")
+
+        # Calculate appropriate height based on number of rows (35px per row + 38px header)
+        table_height = min(len(display_df) * 35 + 38, 500)
+        st.dataframe(display_df, use_container_width=True, hide_index=True, height=table_height)
+
+        # Export button
+        st.divider()
+        if st.button("📥 Export Data to CSV"):
+            from riley.modules.marketdata.export_rrg import export_rrg_sectors
+
+            export_path = Path(__file__).parent.parent / "artifacts" / "rrg" / "rrg_prices_daily.csv"
+            export_rrg_sectors(str(export_path), lookback_days=365)
+            st.success(f"✅ Exported to {export_path}")
+
+    except Exception as e:
+        st.error(f"Error loading RRG data: {e}")
+        st.exception(e)
+
+
 def main():
     """Main app"""
     st.title("Riley Cycles Watch")
@@ -1145,34 +1608,58 @@ def main():
     # Sidebar
     st.sidebar.title("Navigation")
 
+    # Component Status
+    st.sidebar.subheader("Component Status")
+
     # Get latest scan date
     latest_scan = db.get_latest_scan_date()
     if not latest_scan:
         st.error("No scan data found in database. Please run a daily scan first.")
         return
 
-    st.sidebar.success(f"Latest Scan: {format_date(latest_scan)}")
+    # Cycle Scanner status
+    st.sidebar.caption("🔍 Cycle Scanner")
+    st.sidebar.success(f"Last: {format_date(latest_scan)}")
 
-    # Run scan button
-    if st.sidebar.button("Run Scan for Today", use_container_width=True):
-        scan_date = datetime.now().strftime('%Y-%m-%d')
-        with st.spinner(f"Running scan for {scan_date}..."):
-            success, stdout, stderr = run_daily_scan(scan_date)
+    # Get other component statuses from database
+    conn = db._get_connection()
+    cursor = conn.cursor()
 
-            if success:
-                st.sidebar.success(f"Scan completed for {scan_date}")
-                st.rerun()
-            else:
-                st.sidebar.error("Scan failed")
-                if stderr:
-                    st.sidebar.code(stderr, language="text")
+    # askSlim Scraper status
+    cursor.execute("""
+        SELECT MAX(updated_at) as last_update
+        FROM instrument_analysis
+        WHERE status = 'ACTIVE'
+    """)
+    row = cursor.fetchone()
+    if row and row[0]:
+        scraper_time = pd.to_datetime(row[0]).strftime('%d-%b-%Y %H:%M')
+        st.sidebar.caption("📡 askSlim Scraper")
+        st.sidebar.success(f"Last: {scraper_time}")
+    else:
+        st.sidebar.caption("📡 askSlim Scraper")
+        st.sidebar.warning("Never run")
 
+    # Market Data status
+    cursor.execute("SELECT MAX(date) FROM price_bars_daily")
+    row = cursor.fetchone()
+    if row and row[0]:
+        market_date = pd.to_datetime(row[0]).strftime('%d-%b-%Y')
+        st.sidebar.caption("📈 Market Data")
+        st.sidebar.success(f"Last: {market_date}")
+    else:
+        st.sidebar.caption("📈 Market Data")
+        st.sidebar.warning("No data")
+
+    conn.close()
+
+    st.sidebar.caption("Use System Status page for manual updates")
     st.sidebar.divider()
 
     # View selector
     view = st.sidebar.radio(
         "Select View",
-        ["TODAY", "DATABASE", "CALENDAR"],
+        ["TODAY", "DATABASE", "CALENDAR", "RRG"],
         index=0
     )
 
@@ -1248,6 +1735,8 @@ def main():
         render_database_view(filters)
     elif view == "CALENDAR":
         render_calendar_view()
+    elif view == "RRG":
+        render_rrg_view()
 
 
 if __name__ == "__main__":

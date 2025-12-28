@@ -30,9 +30,12 @@ ARTIFACTS_DIR = PROJECT_ROOT / "artifacts" / "askslim"
 ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def verify_session():
+def verify_session(headless=None):
     """
     Verify that the saved session state is valid.
+
+    Args:
+        headless: Run in headless mode (None = use env setting)
 
     Returns:
         bool: True if session is valid, False otherwise
@@ -45,13 +48,16 @@ def verify_session():
             "Please run askslim_login.py first to create the session."
         )
 
+    # Use parameter if provided, otherwise use env setting
+    use_headless = headless if headless is not None else ASKSLIM_HEADLESS
+
     print(f"Loading session state from: {storage_state_path}")
     print(f"Base URL: {ASKSLIM_BASE_URL}")
-    print(f"Headless mode: {ASKSLIM_HEADLESS}")
+    print(f"Headless mode: {use_headless}")
 
     with sync_playwright() as p:
         # Launch browser with saved session state
-        browser = p.chromium.launch(headless=ASKSLIM_HEADLESS)
+        browser = p.chromium.launch(headless=use_headless)
         context = browser.new_context(
             storage_state=str(storage_state_path),
             viewport={'width': 1280, 'height': 720},
@@ -60,9 +66,13 @@ def verify_session():
         page = context.new_page()
 
         try:
-            # Navigate to main page
+            # Navigate to main page (use domcontentloaded instead of networkidle for faster loading)
             print(f"\nNavigating to {ASKSLIM_BASE_URL}...")
-            page.goto(ASKSLIM_BASE_URL, wait_until="networkidle", timeout=30000)
+            page.goto(ASKSLIM_BASE_URL, wait_until="domcontentloaded", timeout=60000)
+
+            # Wait a bit for any logged-in elements to appear
+            print("Waiting for page to settle...")
+            page.wait_for_timeout(2000)  # 2 second pause
 
             print(f"Current URL: {page.url}")
 

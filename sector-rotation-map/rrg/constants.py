@@ -56,11 +56,11 @@ DEFAULT_PARAMS = {
 
 # Chart styling
 CHART_CONFIG = {
-    'width': 1200,
-    'height': 700,
+    'width': 1000,
+    'height': 1000,
     'title_font_size': 24,
     'axis_font_size': 12,
-    'label_font_size': 10,
+    'label_font_size': 16,
     'crosshair_color': 'black',
     'crosshair_width': 2,
     'tail_width': 2,
