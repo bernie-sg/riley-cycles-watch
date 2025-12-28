@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reset Button Test</title>
+</head>
+<body>
+    <h1>Reset Button Test</h1>
+    <p>Testing the reset button fix for peak/trough label shifting</p>
+
+    <h2>Test Steps:</h2>
+    <ol>
+        <li>Load the main application at <a href="http://localhost:5001" target="_blank">http://localhost:5001</a></li>
+        <li>Run analysis with default parameters</li>
+        <li>Note the position of the first peak label (date and y-value)</li>
+        <li>Use the phase shift slider to shift by +10 days</li>
+        <li>Verify peak labels move accordingly</li>
+        <li>Click "Reset Phase Shift" button</li>
+        <li>Verify peak labels return to EXACT original positions</li>
+        <li>Verify mid-cycle labels remain at zero (they were working already)</li>
+    </ol>
+
+    <h2>Expected Result:</h2>
+    <ul>
+        <li>✓ Peak labels should return to original y-values when reset</li>
+        <li>✓ Trough labels should return to original y-values when reset</li>
+        <li>✓ Mid-cycle labels should remain at y=0 (unchanged behavior)</li>
+    </ul>
+
+    <h2>Root Cause Fixed:</h2>
+    <p>The issue was that:</p>
+    <ul>
+        <li><strong>Before:</strong> Initial chart used frontend-calculated peak indices from scaledBandpass,
+            but updatePhaseShiftAnnotations() used backend-calculated indices from currentData.bandpass.peaks</li>
+        <li><strong>After:</strong> Both use the SAME globalPeakIndices calculated from the initial scaledBandpass</li>
+    </ul>
+
+    <h2>Changes Made:</h2>
+    <ol>
+        <li>updatePhaseShiftAnnotations() now uses globalScaledBandpass on reset (not globalOriginalBandpass)</li>
+        <li>Uses globalPeakIndices and globalTroughIndices (not currentData.bandpass.peaks/troughs)</li>
+        <li>Uses globalFilteredDates (not currentData.price_data.dates)</li>
+        <li>Uses globalAdjustedHistoricalLength (not currentData.bandpass.historical_length)</li>
+    </ol>
+
+    <p><strong>Result:</strong> Peak/trough indices now map to the exact same bandpass values on reset as they did on initial load.</p>
+</body>
+</html>

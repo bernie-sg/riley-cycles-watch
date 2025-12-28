@@ -300,7 +300,15 @@ class CyclesRebuilder:
             else:
                 raise ValueError(f"Unknown timeframe: {timeframe}")
 
-            # Delete existing projections for this (instrument_id, timeframe, version)
+            # IMPORTANT: Deactivate ALL old active projections for this (instrument_id, timeframe)
+            # This prevents accumulation of duplicate active projections when versions change
+            cursor.execute("""
+                UPDATE cycle_projections
+                SET active = 0
+                WHERE instrument_id = ? AND timeframe = ? AND active = 1
+            """, (instrument_id, timeframe))
+
+            # Delete existing projections for this specific version (cleanup)
             cursor.execute("""
                 DELETE FROM cycle_projections
                 WHERE instrument_id = ? AND timeframe = ? AND version = ?

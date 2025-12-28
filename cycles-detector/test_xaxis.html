@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test X-Axis Calculation</title>
+</head>
+<body>
+    <h1>X-Axis Calculation Test</h1>
+    <div id="output"></div>
+
+    <script>
+        // Simulate the data structure
+        const data = {
+            bandpass: {
+                wavelength: 350,  // Trading days
+                historical_length: 4000
+            },
+            price_data: {
+                dates: []
+            }
+        };
+
+        // Generate fake dates (4000 historical + 3500 future = 7500 total)
+        const startDate = new Date('2020-01-01');
+        for (let i = 0; i < 7500; i++) {
+            const date = new Date(startDate);
+            date.setDate(date.getDate() + i);
+            data.price_data.dates.push(date.toISOString().split('T')[0]);
+        }
+
+        // The problematic code
+        const historicalLength = data.bandpass.historical_length;
+        const wavelengthInTradingDays = data.bandpass.wavelength;
+        const futureCyclesToShow = 2.5;
+        const futurePointsToShow = Math.round(wavelengthInTradingDays * futureCyclesToShow);
+        const endDateIndex = Math.min(historicalLength + futurePointsToShow, data.price_data.dates.length - 1);
+
+        // Output results
+        const output = document.getElementById('output');
+        output.innerHTML = `
+            <p><strong>Historical Length:</strong> ${historicalLength}</p>
+            <p><strong>Wavelength (trading days):</strong> ${wavelengthInTradingDays}</p>
+            <p><strong>Future Cycles to Show:</strong> ${futureCyclesToShow}</p>
+            <p><strong>Future Points to Show:</strong> ${futurePointsToShow}</p>
+            <p><strong>Total Dates Available:</strong> ${data.price_data.dates.length}</p>
+            <p><strong>End Date Index:</strong> ${endDateIndex}</p>
+            <p><strong>Start Date:</strong> ${data.price_data.dates[0]}</p>
+            <p><strong>End Date (what chart will show):</strong> ${data.price_data.dates[endDateIndex]}</p>
+            <p><strong>Actual last date available:</strong> ${data.price_data.dates[data.price_data.dates.length - 1]}</p>
+        `;
+    </script>
+</body>
+</html>

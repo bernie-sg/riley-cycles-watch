@@ -1,0 +1,118 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Alignment Test: SPY 420d</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        h1 { color: #4CAF50; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #444; padding: 12px; text-align: left; }
+        th { background-color: #333; }
+        tr:hover { background-color: #2a2a2a; }
+        .best { background-color: #1b5e20 !important; font-weight: bold; }
+        .good { color: #4CAF50; }
+        .bad { color: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>Alignment Strategy Test: SPY 420d</h1>
+
+    <h2>Test Results</h2>
+    <table>
+        <tr>
+            <th>Align To</th>
+            <th>Num Recent</th>
+            <th>Aligned Date</th>
+            <th>Peak Alignment</th>
+            <th>Trough Alignment</th>
+            <th>Overall Score</th>
+        </tr>
+
+        <tr class="best">
+            <td>peak</td>
+            <td>1</td>
+            <td>2025-10-08T00:00:00.000000000</td>
+            <td>22.8%</td>
+            <td>24.4%</td>
+            <td><b>23.6%</b></td>
+        </tr>
+
+        <tr class="">
+            <td>trough</td>
+            <td>7</td>
+            <td>2020-03-23T00:00:00.000000000</td>
+            <td>29.0%</td>
+            <td>22.0%</td>
+            <td><b>25.5%</b></td>
+        </tr>
+
+        <tr class="">
+            <td>trough</td>
+            <td>1</td>
+            <td>2025-04-08T00:00:00.000000000</td>
+            <td>29.1%</td>
+            <td>22.3%</td>
+            <td><b>25.7%</b></td>
+        </tr>
+
+        <tr class="">
+            <td>peak</td>
+            <td>5</td>
+            <td>2021-12-27T00:00:00.000000000</td>
+            <td>24.2%</td>
+            <td>27.3%</td>
+            <td><b>25.8%</b></td>
+        </tr>
+
+        <tr class="">
+            <td>peak</td>
+            <td>3</td>
+            <td>2024-03-21T00:00:00.000000000</td>
+            <td>28.8%</td>
+            <td>23.4%</td>
+            <td><b>26.1%</b></td>
+        </tr>
+
+        <tr class="">
+            <td>trough</td>
+            <td>5</td>
+            <td>2022-01-27T00:00:00.000000000</td>
+            <td>29.8%</td>
+            <td>23.2%</td>
+            <td><b>26.5%</b></td>
+        </tr>
+
+        <tr class="">
+            <td>trough</td>
+            <td>3</td>
+            <td>2023-10-27T00:00:00.000000000</td>
+            <td>30.3%</td>
+            <td>23.2%</td>
+            <td><b>26.8%</b></td>
+        </tr>
+
+        <tr class="">
+            <td>peak</td>
+            <td>7</td>
+            <td>2020-02-19T00:00:00.000000000</td>
+            <td>25.9%</td>
+            <td>28.4%</td>
+            <td><b>27.1%</b></td>
+        </tr>
+
+    </table>
+
+    <h2>Best Configuration</h2>
+    <ul>
+        <li><b>Align to:</b> peak</li>
+        <li><b>Num recent:</b> 1</li>
+        <li><b>Overall score:</b> 23.6%</li>
+        <li><b>Peak alignment:</b> 22.8%</li>
+        <li><b>Trough alignment:</b> 24.4%</li>
+    </ul>
+
+    <h2>Interpretation</h2>
+    <p>Lower scores are better. Score represents average distance between sine wave extrema and actual price extrema, as percentage of wavelength.</p>
+</body>
+</html>

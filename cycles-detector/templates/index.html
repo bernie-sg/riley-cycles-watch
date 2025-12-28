@@ -1,0 +1,2907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Cycles Detector</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #000000;
+            color: #ffffff;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+        .header p {
+            color: #ccc;
+            font-size: 1.1em;
+        }
+
+        .help-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #0088CC;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+
+        .help-button:hover {
+            background: #0099DD;
+        }
+
+        .help-section {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1a1a1a;
+            border: 2px solid #0088CC;
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 1000px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            z-index: 1001;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+
+        .help-section.show {
+            display: block;
+        }
+
+        .help-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+        }
+
+        .help-overlay.show {
+            display: block;
+        }
+
+        .help-section h2 {
+            color: #0088CC;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        .help-section h3 {
+            color: #00AAFF;
+            margin-top: 25px;
+            margin-bottom: 12px;
+            font-size: 18px;
+        }
+
+        .help-section h4 {
+            color: #66CCFF;
+            margin-top: 15px;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+
+        .help-section p {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+
+        .help-section ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .help-section pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .help-section table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        .help-section th,
+        .help-section td {
+            border: 1px solid #333;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .help-section th {
+            background: #222;
+            color: #0088CC;
+        }
+
+        .help-close {
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            color: #888;
+        }
+
+        .help-close:hover {
+            color: #fff;
+        }
+
+        .controls {
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border: 1px solid #333;
+        }
+
+        .controls h3 {
+            margin-bottom: 15px;
+            color: #fff;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-item label {
+            color: #ccc;
+            font-size: 0.9em;
+        }
+
+        .control-item input, .control-item select {
+            padding: 8px 12px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 0.9em;
+        }
+
+        .control-item input:focus, .control-item select:focus {
+            outline: none;
+            border-color: #6600cc;
+        }
+
+        .alignment-buttons {
+            display: flex;
+            gap: 0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .alignment-btn {
+            flex: 1;
+            padding: 8px 16px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: #fff;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-radius: 0;
+        }
+
+        .alignment-btn:first-child {
+            border-right: none;
+            border-radius: 4px 0 0 4px;
+        }
+
+        .alignment-btn:last-child {
+            border-left: none;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .alignment-btn:hover:not(.active) {
+            background: #333;
+        }
+
+        .alignment-btn.active {
+            background: #0088CC;
+            border-color: #0088CC;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .btn {
+            background: #6600cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s;
+        }
+
+        .btn:hover {
+            background: #7a1acc;
+        }
+
+        .btn:disabled {
+            background: #444;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .status.loading {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: #ccc;
+        }
+
+        .status.success {
+            background: #1a3d1a;
+            border: 1px solid #4a7c59;
+            color: #90ee90;
+        }
+
+        .status.error {
+            background: #3d1a1a;
+            border: 1px solid #7c4a4a;
+            color: #ffcccb;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 30px;
+        }
+
+        .chart-section {
+            background: #1a1a1a;
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid #333;
+        }
+
+        .chart-section h3 {
+            margin-bottom: 15px;
+            color: #fff;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .chart {
+            width: 100%;
+            height: 45vh;
+            min-height: 400px;
+            background: #000000;
+            border-radius: 4px;
+        }
+
+        .heatmap-chart {
+            height: 400px;
+        }
+
+        .power-spectrum-chart {
+            height: 300px;
+        }
+
+        .rating-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .rating-A {
+            background: linear-gradient(135deg, #ff6b00 0%, #ff0000 100%);
+            color: white;
+        }
+
+        .rating-B {
+            background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%);
+            color: black;
+        }
+
+        .rating-C {
+            background: linear-gradient(135deg, #ffdd00 0%, #ffaa00 100%);
+            color: black;
+        }
+
+        .rating-D {
+            background: linear-gradient(135deg, #666 0%, #444 100%);
+            color: #ccc;
+        }
+
+        .cycles-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .cycle-item {
+            background: #2a2a2a;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            text-align: center;
+        }
+
+        .cycle-item.selected {
+            border-color: #6600cc;
+            background: #2a1a3a;
+        }
+
+        .cycle-item:hover {
+            border-color: #9933ff;
+            background: #3a2a4a;
+            cursor: pointer;
+        }
+
+        .cycle-wavelength {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .cycle-amplitude {
+            font-size: 0.9em;
+            color: #ccc;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #444;
+            border-radius: 50%;
+            border-top-color: #6600cc;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .control-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .chart {
+                height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Cycles Detector</h1>
+            <p>Advanced Market Cycle Detection and Analysis System</p>
+        </div>
+
+        <div class="controls">
+            <h3>Analysis Configuration</h3>
+            <div class="control-group">
+                <div class="control-item">
+                    <label for="symbol">Symbol</label>
+                    <input type="text" id="symbol" value="" placeholder="e.g., TLT, SPY, QQQ" style="text-transform: uppercase;">
+                </div>
+                <div class="control-item">
+                    <label for="windowSize">Window Size (bars)</label>
+                    <select id="windowSize">
+                        <option value="500">500</option>
+                        <option value="1000">1000</option>
+                        <option value="2000">2000</option>
+                        <option value="3000">3000</option>
+                        <option value="4000" selected>4000</option>
+                        <option value="5000">5000</option>
+                    </select>
+                </div>
+                <div class="control-item">
+                    <label for="minWavelength">Min Wavelength</label>
+                    <input type="number" id="minWavelength" value="50" min="10" max="500">
+                </div>
+                <div class="control-item">
+                    <label for="maxWavelength">Max Wavelength</label>
+                    <input type="number" id="maxWavelength" value="600" min="200" max="1200">
+                </div>
+                <div class="control-item">
+                    <label for="wavelengthStep">Step Size</label>
+                    <input type="number" id="wavelengthStep" value="5" min="1" max="50">
+                </div>
+                <div class="control-item">
+                    <label for="suppressLongCycles" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="suppressLongCycles" checked style="width: auto; cursor: pointer;">
+                        <span>Suppress Long Cycles (&gt;600d)</span>
+                    </label>
+                </div>
+                <div class="control-item">
+                    <label for="scanAlgorithm">Scan Algorithm</label>
+                    <select id="scanAlgorithm">
+                        <option value="morlet" selected>Morlet Wavelet</option>
+                        <option value="goertzel">Goertzel (Noisy Markets)</option>
+                        <option value="mesa">MESA</option>
+                    </select>
+                </div>
+                <input type="hidden" id="alignTo" value="trough">
+                <div class="control-item">
+                    <label for="heatmapYears">Heatmap History (years)</label>
+                    <input type="number" id="heatmapYears" value="10" min="1" max="20">
+                </div>
+                <div class="control-item">
+                    <label for="priceChartYears">Price Chart History (years)</label>
+                    <input type="number" id="priceChartYears" value="20" min="1" max="30">
+                </div>
+                <div class="control-item">
+                    <button id="analyzeBtn" class="btn">Run Analysis</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="status" class="status" style="display: none;"></div>
+
+        <div id="results" style="display: none;">
+            <div class="charts-container">
+                <div class="chart-section">
+                    <h3>Power Spectrum</h3>
+                    <div id="powerSpectrumChart" class="chart power-spectrum-chart"></div>
+                    <div class="cycles-list" id="cyclesList"></div>
+                </div>
+
+                <div class="chart-section">
+                    <h3>Price Chart with Bandpass Overlay
+                        <div style="float: right; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 0.9em; color: #ccc;">Wavelength:</span>
+                            <input type="number" id="manualWavelength" min="20" max="3000" step="1" placeholder="e.g. 564"
+                                   style="background: #333; color: white; border: 1px solid #666; padding: 5px; width: 70px; text-align: center;">
+                            <span style="font-size: 0.9em; color: #ccc;">Bandwidth:</span>
+                            <input type="number" id="manualBandwidth" value="0.10" min="0.01" max="0.50" step="0.01"
+                                   style="background: #333; color: white; border: 1px solid #666; padding: 5px; width: 60px; text-align: center;">
+                            <input type="hidden" id="phasingMode" value="trough">
+                            <button id="applyManualBandpass" style="background: #6600cc; color: white; border: 1px solid #666; padding: 5px 10px; cursor: pointer; margin-left: 10px;">Apply</button>
+                            <button id="exportData" style="background: #cc6600; color: white; border: 1px solid #666; padding: 5px 10px; cursor: pointer; margin-left: 10px;">Export Data</button>
+                            <span style="margin-left: 25px; font-size: 0.9em; color: #ccc;">Vertical Lines:</span>
+                            <button id="togglePeakLines" style="background: #333; color: #ff4444; border: 1px solid #666; padding: 5px 10px; cursor: pointer;">Peaks</button>
+                            <button id="toggleTroughLines" style="background: #333; color: #44ff44; border: 1px solid #666; padding: 5px 10px; cursor: pointer;">Troughs</button>
+                            <button id="toggleMidCycleLines" style="background: #333; color: #ffaa44; border: 1px solid #666; padding: 5px 10px; cursor: pointer;">Mid-Cycles</button>
+                        </div>
+                        <div style="margin-top: 10px; padding: 8px; background: rgba(0,255,255,0.05); border-radius: 4px;">
+                            <span style="font-size: 0.9em; color: #00FFFF; font-weight: bold;">Moving Average:</span>
+                            <span style="font-size: 0.9em; color: #ccc; margin-left: 10px;">Type:</span>
+                            <select id="maType" style="background: #333; color: white; border: 1px solid #666; padding: 5px; margin-left: 5px;">
+                                <option value="SMA">Simple (SMA)</option>
+                                <option value="EMA" selected>Exponential (EMA)</option>
+                            </select>
+                            <span style="font-size: 0.9em; color: #ccc; margin-left: 15px;">Length:</span>
+                            <input type="number" id="maLength" value="21" min="5" max="500" step="1"
+                                   style="background: #333; color: white; border: 1px solid #666; padding: 5px; width: 60px; text-align: center; margin-left: 5px;">
+                            <button id="applyMA" style="background: #008888; color: white; border: 1px solid #00FFFF; padding: 5px 15px; cursor: pointer; margin-left: 15px;">Apply MA</button>
+                            <button id="toggleMA" style="background: #444; color: #00FFFF; border: 1px solid #666; padding: 5px 10px; cursor: pointer; margin-left: 5px;">Show MA</button>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <span style="color: #aaa; margin-right: 10px;">Display:</span>
+                            <button id="toggleBandpass" style="background: #444; color: #FFAA00; border: 1px solid #666; padding: 5px 10px; cursor: pointer;">Hide Bandpass</button>
+                            <span style="color: #aaa; margin-left: 20px; margin-right: 10px;">Phase Alignment:</span>
+                            <div class="alignment-buttons" style="display: inline-flex;">
+                                <button id="alignToTrough" class="alignment-btn active" data-align="trough">Trough</button>
+                                <button id="alignToPeak" class="alignment-btn" data-align="peak">Peak</button>
+                            </div>
+                        </div>
+                    </h3>
+                    <div id="priceChart" class="chart"></div>
+
+                    <!-- Quick Reference Guide with Phase Info -->
+                    <div style="margin-top: 15px; padding: 15px; background: #1a1a1a; border-left: 3px solid #6600cc; font-size: 0.9em; color: #ccc;">
+                        <strong style="color: #fff;">Quick Reference:</strong><br>
+                        <div id="systemInfo" style="display: none; margin: 10px 0; padding: 10px; background: #1a2a1a; border-radius: 4px; border: 1px solid #4a9b4a;">
+                            <strong style="color: #88ff88;">Window:</strong> <span id="infoWindowSize" style="color: #fff;"></span>
+                            <span style="margin: 0 10px; color: #666;">|</span>
+                            <strong style="color: #88ff88;">Data:</strong> <span id="infoDataPoints" style="color: #fff;"></span>
+                            <span style="margin: 0 10px; color: #666;">|</span>
+                            <strong style="color: #88ff88;">Heatmap:</strong> <span id="infoHeatmapRange" style="color: #fff;"></span>
+                            <span style="margin: 0 10px; color: #666;">|</span>
+                            <strong style="color: #88ff88;">Range:</strong> <span id="infoWavelengthRange" style="color: #fff;"></span>
+                        </div>
+                        <div id="phaseInfo" style="display: none; margin: 10px 0; padding: 10px; background: #2a1a3a; border-radius: 4px; border: 1px solid #6600cc;">
+                            <strong style="color: #FFD700;">Current Phase:</strong>
+                            <span id="phaseDescription" style="color: #fff; margin-left: 10px;"></span>
+                            <span style="margin: 0 15px; color: #666;">|</span>
+                            <span id="nextTurning" style="color: #ccc;"></span>
+                            <span style="margin: 0 15px; color: #666;">|</span>
+                            <span id="wavelengthInfo" style="color: #ccc;"></span>
+                        </div>
+                        • <strong>Wavelength:</strong> Enter cycle period in trading days (e.g., 564 for ~2-year cycle)<br>
+                        • <strong>Bandwidth:</strong> Filter tolerance (default 0.10 = ±10% range). Lower = more precise, higher = more flexible<br>
+                        • <strong>Phase Reset:</strong> Reset bandpass to original phase alignment<br>
+                        • <strong>Red dates:</strong> Projected peaks (potential highs)<br>
+                        • <strong>Green dates:</strong> Projected troughs (potential lows)
+                    </div>
+                </div>
+
+                <div class="chart-section">
+                    <h3>Cycle Heatmap</h3>
+                    <div id="heatmapChart" style="height: 400px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+        let allCyclesData = [];  // Store all cycles with their sync_info for cycle switching
+
+        // Alignment caching: Store bandpass data for both peak and trough
+        let alignmentCache = {};  // Structure: { 'wavelength-peak': data, 'wavelength-trough': data }
+        let currentAlignment = 'trough';  // Track current alignment mode
+
+        // Global variables for vertical line toggle feature and pan updates
+        let globalPeakIndices = [];
+        let globalTroughIndices = [];
+        let globalMidCycleIndices = [];
+        let globalHistoricalPeaks = [];
+        let globalHistoricalTroughs = [];
+        let globalFilteredDates = [];
+        let globalFilteredPrices = [];
+        let globalScaledBandpass = [];
+        let globalOriginalBandpass = [];  // Store original unshifted bandpass for reset
+        let globalAdjustedHistoricalLength = 0;
+        let globalBandpassScaleFactor = 0.8;
+        let selectedCycle = null;
+        let priceChartPhaseShift = 0; // Phase shift in bars for bandpass overlay
+
+        // Moving Average state
+        let maPhaseShift = 0;
+        let maVisible = false;
+        let globalMaValues = [];
+        let globalMaType = 'EMA';
+        let globalMaLength = 21;
+
+        // Bandpass visibility state
+        let bandpassVisible = true;  // Shown by default
+        let savedAnnotations = [];  // Store annotations for show/hide
+
+        // Removed priceChartZoomLevel - using Plotly's native zoom instead
+        let peakLinesVisible = false;
+        let troughLinesVisible = false;
+        let midCycleLinesVisible = false;
+
+        // Helper function to format date for annotations
+        function formatDateShort(dateStr) {
+            const date = new Date(dateStr);
+            const day = date.getDate();
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const month = monthNames[date.getMonth()];
+            const year = date.getFullYear();
+            return `${day} ${month} ${year}`;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('analyzeBtn').addEventListener('click', runAnalysis);
+
+            // Alignment button controls
+            document.getElementById('alignToTrough').addEventListener('click', () => switchAlignment('trough'));
+            document.getElementById('alignToPeak').addEventListener('click', () => switchAlignment('peak'));
+
+            // Manual wavelength and bandwidth controls
+            document.getElementById('applyManualBandpass').addEventListener('click', applyManualBandpass);
+            document.getElementById('exportData').addEventListener('click', exportCycleData);
+
+            // Vertical lines toggle controls
+            document.getElementById('togglePeakLines').addEventListener('click', () => toggleVerticalLines('peaks'));
+            document.getElementById('toggleTroughLines').addEventListener('click', () => toggleVerticalLines('troughs'));
+            document.getElementById('toggleMidCycleLines').addEventListener('click', () => toggleVerticalLines('midcycles'));
+
+            // Moving Average controls
+            document.getElementById('applyMA').addEventListener('click', applyMA);
+            document.getElementById('toggleMA').addEventListener('click', toggleMA);
+            document.getElementById('toggleBandpass').addEventListener('click', toggleBandpass);
+        });
+
+        function showStatus(message, type = 'loading') {
+            const status = document.getElementById('status');
+            status.style.display = 'block';
+            status.className = `status ${type}`;
+
+            if (type === 'loading') {
+                status.innerHTML = `<span class="loading-spinner"></span> ${message}`;
+            } else {
+                status.innerHTML = message;
+            }
+        }
+
+        function hideStatus() {
+            document.getElementById('status').style.display = 'none';
+        }
+
+        async function runAnalysis() {
+            const btn = document.getElementById('analyzeBtn');
+            btn.disabled = true;
+
+            const symbol = document.getElementById('symbol').value.toUpperCase();
+            showStatus('Starting analysis...', 'loading');
+
+            // Start polling for progress updates
+            let progressInterval = setInterval(async () => {
+                try {
+                    const progressResponse = await fetch(`/api/progress/${symbol}`);
+                    const progressData = await progressResponse.json();
+                    if (progressData.message) {
+                        showStatus(progressData.message, 'loading');
+                    }
+                } catch (err) {
+                    console.error('Progress poll error:', err);
+                }
+            }, 500);  // Poll every 500ms
+
+            try {
+                const params = new URLSearchParams({
+                    symbol: symbol,
+                    window_size: document.getElementById('windowSize').value,
+                    min_wavelength: document.getElementById('minWavelength').value,
+                    max_wavelength: document.getElementById('maxWavelength').value,
+                    wavelength_step: document.getElementById('wavelengthStep').value,
+                    suppress_long_cycles: document.getElementById('suppressLongCycles').checked,
+                    scan_algorithm: document.getElementById('scanAlgorithm').value,
+                    align_to: document.getElementById('alignTo').value,
+                    bandpass_phase_method: 'actual_price_peaks',
+                    heatmap_years: document.getElementById('heatmapYears').value,
+                    price_chart_years: document.getElementById('priceChartYears').value,
+                    _t: Date.now()  // Cache buster
+                });
+
+                const response = await fetch(`/api/analyze?${params}`);
+                const data = await response.json();
+
+                // Stop polling
+                clearInterval(progressInterval);
+
+                if (data.success) {
+                    currentData = data;
+                    displayResults(data);
+                    showStatus('Analysis completed successfully!', 'success');
+                    setTimeout(hideStatus, 3000);
+                } else {
+                    showStatus(`Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                clearInterval(progressInterval);
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function displayResults(data) {
+            document.getElementById('results').style.display = 'block';
+
+            // Store all cycles data globally for cycle switching
+            allCyclesData = data.peak_cycles || [];
+
+            // Update info grid
+            updateInfoGrid(data.config, data.bandpass);
+
+            // Create charts
+            createPriceChart(data);
+            createHeatmapChart(data);
+            createPowerSpectrumChart(data);
+
+            createCyclesList(data.peak_cycles, data.config.selected_cycle);
+        }
+
+        function updateInfoGrid(config, bandpass) {
+            // Update system info in Quick Reference
+            document.getElementById('systemInfo').style.display = 'block';
+            document.getElementById('infoWindowSize').textContent = `${config.window_size} bars`;
+            document.getElementById('infoDataPoints').textContent = `${config.data_points.toLocaleString()} points`;
+            document.getElementById('infoHeatmapRange').textContent = `${config.heatmap_years} years`;
+            document.getElementById('infoWavelengthRange').textContent = `${config.wavelength_range} days`;
+        }
+
+        function createPriceChart(data) {
+            // CORRECT V7 APPROACH: Only shift bandpass VALUES, keep dates/prices fixed
+            const shift = priceChartPhaseShift;
+            const rawDates = data.price_data.dates;
+            const rawPrices = data.price_data.prices;
+            const rawBandpass = data.bandpass.scaled_values;
+
+            // Apply phase shift to bandpass values only
+            const shiftedBandpass = applyPhaseShift(rawBandpass, shift);
+
+            // Use full data (no zoom level filtering - Plotly handles zoom natively)
+            const filteredDates = rawDates;
+            const filteredPrices = rawPrices;
+            const filteredBandpass = shiftedBandpass;
+            const cutoffIdx = 0;
+
+            // Shift peak/trough indices to match the phase-shifted bandpass
+            const shiftPeakTroughIndices = (indices, shiftAmount) => {
+                return indices.map(idx => {
+                    let newIdx = idx + shiftAmount;
+                    // Wrap around if needed
+                    if (newIdx < 0) newIdx += filteredDates.length;
+                    if (newIdx >= filteredDates.length) newIdx -= filteredDates.length;
+                    return newIdx;
+                }).filter(idx => idx >= 0 && idx < filteredDates.length);
+            };
+
+            // DON'T slice again - use filtered data arrays
+            const symbol = document.getElementById('symbol').value.toUpperCase();
+            const priceTrace = {
+                x: filteredDates,
+                y: filteredPrices,
+                type: 'scatter',
+                mode: 'lines',
+                name: `${symbol} Price`,
+                line: { color: 'rgba(255,255,255,0.3)', width: 1 },  // Dim the price line
+                xaxis: 'x',  // Use main x-axis (pannable/zoomable)
+                yaxis: 'y'   // Use main y-axis (pannable/zoomable)
+            };
+
+            // Center bandpass at zero and scale to 80% to leave room for labels
+            const bandpassMean = filteredBandpass.reduce((a, b) => a + b, 0) / filteredBandpass.length;
+            const centeredBandpass = filteredBandpass.map(v => v - bandpassMean);
+            const bandpassScaleFactor = 0.8;
+            const scaledBandpass = centeredBandpass.map(v => v * bandpassScaleFactor);
+
+            // Store FULL original bandpass for reset (before any phase shift)
+            // Apply same centering/scaling to the unshifted rawBandpass
+            const originalMean = rawBandpass.reduce((a, b) => a + b, 0) / rawBandpass.length;
+            const originalCentered = rawBandpass.map(v => v - originalMean);
+            const originalScaled = originalCentered.map(v => v * bandpassScaleFactor);
+
+            const bandpassTrace = {
+                x: filteredDates,
+                y: scaledBandpass,
+                type: 'scatter',
+                mode: 'lines',
+                name: `Bandpass (${data.bandpass.wavelength}d)`,
+                line: { color: '#FFD700', width: 1.5 },
+                xaxis: 'x2',  // Use fixed x-axis2 (overlay, no pan/zoom)
+                yaxis: 'y2'   // Use fixed y-axis2 (overlay, no pan/zoom)
+            };
+
+            // Detect peaks, troughs, and mid-cycles directly from filtered bandpass data
+            function findPeaks(signal, wavelength, minDistance = null) {
+                // Use wavelength/4 as minimum distance between peaks
+                const distance = minDistance || Math.floor(wavelength / 4);
+
+                // First pass: find ALL local maxima
+                const allPeaks = [];
+                for (let i = 1; i < signal.length - 1; i++) {
+                    if (signal[i] > signal[i-1] && signal[i] > signal[i+1]) {
+                        allPeaks.push({idx: i, value: signal[i]});
+                    }
+                }
+
+                // Second pass: filter by distance, keeping highest peaks
+                const filteredPeaks = [];
+                let i = 0;
+                while (i < allPeaks.length) {
+                    // Find all peaks within distance window
+                    const windowEnd = allPeaks[i].idx + distance;
+                    const window = [allPeaks[i]];
+                    let j = i + 1;
+                    while (j < allPeaks.length && allPeaks[j].idx < windowEnd) {
+                        window.push(allPeaks[j]);
+                        j++;
+                    }
+
+                    // Keep the highest peak in this window
+                    const best = window.reduce((max, p) => p.value > max.value ? p : max);
+                    filteredPeaks.push(best.idx);
+
+                    // Skip past this window
+                    i = j;
+                }
+
+                return filteredPeaks;
+            }
+
+            function findTroughs(signal, wavelength, minDistance = null) {
+                // Use wavelength/4 as minimum distance between troughs
+                const distance = minDistance || Math.floor(wavelength / 4);
+
+                // First pass: find ALL local minima
+                const allTroughs = [];
+                for (let i = 1; i < signal.length - 1; i++) {
+                    if (signal[i] < signal[i-1] && signal[i] < signal[i+1]) {
+                        allTroughs.push({idx: i, value: signal[i]});
+                    }
+                }
+
+                // Second pass: filter by distance, keeping lowest troughs
+                const filteredTroughs = [];
+                let i = 0;
+                while (i < allTroughs.length) {
+                    // Find all troughs within distance window
+                    const windowEnd = allTroughs[i].idx + distance;
+                    const window = [allTroughs[i]];
+                    let j = i + 1;
+                    while (j < allTroughs.length && allTroughs[j].idx < windowEnd) {
+                        window.push(allTroughs[j]);
+                        j++;
+                    }
+
+                    // Keep the lowest trough in this window
+                    const best = window.reduce((min, p) => p.value < min.value ? p : min);
+                    filteredTroughs.push(best.idx);
+
+                    // Skip past this window
+                    i = j;
+                }
+
+                return filteredTroughs;
+            }
+
+
+            function findMidCycles(bandpass) {
+                // Mid-cycles are where bandpass crosses ZERO
+                const midCycles = [];
+                for (let i = 1; i < bandpass.length; i++) {
+                    const prev = bandpass[i-1];
+                    const curr = bandpass[i];
+                    // Check for zero crossing (sign change)
+                    if ((prev < 0 && curr >= 0) || (prev > 0 && curr <= 0)) {
+                        midCycles.push(i);
+                    }
+                }
+                return midCycles;
+            }
+
+            const wavelength = data.bandpass.wavelength;
+
+            // Calculate peak/trough positions mathematically based on wavelength
+            // For a perfect sine wave with period W:
+            // - Peaks occur every W bars
+            // - Troughs occur every W bars, offset by W/2
+            const peakIndices = [];
+            const troughIndices = [];
+
+            // Find where the first peak is by finding the maximum value in first wavelength
+            let firstPeakIdx = 0;
+            let maxVal = scaledBandpass[0];
+            for (let i = 1; i < Math.min(wavelength, scaledBandpass.length); i++) {
+                if (scaledBandpass[i] > maxVal) {
+                    maxVal = scaledBandpass[i];
+                    firstPeakIdx = i;
+                }
+            }
+
+            // Generate all peaks
+            for (let i = firstPeakIdx; i < scaledBandpass.length; i += wavelength) {
+                peakIndices.push(Math.round(i));
+            }
+
+            // Find where the first trough is by finding the minimum value in first wavelength
+            let firstTroughIdx = 0;
+            let minVal = scaledBandpass[0];
+            for (let i = 1; i < Math.min(wavelength, scaledBandpass.length); i++) {
+                if (scaledBandpass[i] < minVal) {
+                    minVal = scaledBandpass[i];
+                    firstTroughIdx = i;
+                }
+            }
+
+            // Generate all troughs
+            for (let i = firstTroughIdx; i < scaledBandpass.length; i += wavelength) {
+                troughIndices.push(Math.round(i));
+            }
+
+            // Find mid-cycle crossings (zero crossings) from displayed bandpass
+            const midCycleIndices = [];
+            for (let i = 1; i < scaledBandpass.length; i++) {
+                const prev = scaledBandpass[i-1];
+                const curr = scaledBandpass[i];
+                if ((prev < 0 && curr >= 0) || (prev > 0 && curr <= 0)) {
+                    midCycleIndices.push(i);
+                }
+            }
+
+            const peaksTrace = {
+                x: peakIndices.map(idx => filteredDates[idx]),
+                y: peakIndices.map(idx => scaledBandpass[idx]),
+                type: 'scatter',
+                mode: 'markers',
+                name: 'Peaks',
+                marker: { color: 'red', size: 8 },
+                xaxis: 'x2',  // Stay fixed with bandpass
+                yaxis: 'y2'
+            };
+
+            const troughsTrace = {
+                x: troughIndices.map(idx => filteredDates[idx]),
+                y: troughIndices.map(idx => scaledBandpass[idx]),
+                type: 'scatter',
+                mode: 'markers',
+                name: 'Troughs',
+                marker: { color: 'lime', size: 8 },
+                xaxis: 'x2',  // Stay fixed with bandpass
+                yaxis: 'y2'
+            };
+
+            const midCyclesTrace = {
+                x: midCycleIndices.map(idx => filteredDates[idx]),
+                y: midCycleIndices.map(idx => 0),  // Always at zero crossing
+                type: 'scatter',
+                mode: 'markers',
+                name: 'Mid-Cycles',
+                marker: { color: 'orange', size: 10, symbol: 'diamond' },
+                xaxis: 'x2',  // Stay fixed with bandpass
+                yaxis: 'y2'   // Stay fixed with bandpass
+            };
+
+            // Calculate Y-axis ranges
+            // Y-axis (price): Use full price range
+            const priceMin = Math.min(...filteredPrices.filter(p => p !== null));
+            const priceMax = Math.max(...filteredPrices.filter(p => p !== null));
+            const priceRange = priceMax - priceMin;
+            const yAxisMin = priceMin - priceRange * 0.05;
+            const yAxisMax = priceMax + priceRange * 0.05;
+
+            // Y-axis2 (bandpass): Centered at 0 with 20% margins
+            const bandpassMin = Math.min(...scaledBandpass.filter(b => b !== null));
+            const bandpassMax = Math.max(...scaledBandpass.filter(b => b !== null));
+            const bandpassRange = bandpassMax - bandpassMin;
+            const y2AxisMin = bandpassMin - bandpassRange * 0.20; // 20% margin bottom
+            const y2AxisMax = bandpassMax + bandpassRange * 0.20; // 20% margin top
+
+            // Add date annotations for projected peaks, troughs, and mid-cycles
+            const annotations = [];
+            const historicalLength = data.bandpass.historical_length;
+            const adjustedHistoricalLength = historicalLength - cutoffIdx;
+
+            // Show ALL historical peaks/troughs (no limit)
+            const historicalPeaks = peakIndices.filter(idx => idx < adjustedHistoricalLength);
+            const historicalTroughs = troughIndices.filter(idx => idx < adjustedHistoricalLength);
+
+            // Store data in global variables for toggle function and pan updates
+            globalPeakIndices = peakIndices;
+            globalTroughIndices = troughIndices;
+            globalMidCycleIndices = midCycleIndices;
+            globalHistoricalPeaks = historicalPeaks;
+            globalHistoricalTroughs = historicalTroughs;
+            globalFilteredDates = filteredDates;
+            globalFilteredPrices = filteredPrices;
+            globalScaledBandpass = scaledBandpass;
+            globalOriginalBandpass = originalScaled.slice();  // Store FULL unshifted bandpass
+            globalAdjustedHistoricalLength = adjustedHistoricalLength;
+            globalBandpassScaleFactor = bandpassScaleFactor;
+
+            // Add annotations for ALL peaks (not just historical) - aligned to TOP of bandpass
+            peakIndices.forEach(idx => {
+                if (idx >= 0 && idx < filteredDates.length && filteredDates[idx]) {
+                    const date = filteredDates[idx];
+                    const bandpassValue = scaledBandpass[idx];
+                    annotations.push({
+                        x: date,
+                        y: bandpassValue,  // Align to bandpass peak
+                        text: formatDateShort(date),
+                        xref: 'x2',  // Attach to fixed bandpass x-axis
+                        yref: 'y2',  // Attach to fixed bandpass y-axis
+                        showarrow: true,
+                        arrowhead: 2,
+                        arrowsize: 1,
+                        arrowwidth: 1,
+                        arrowcolor: 'red',
+                        ax: 0,
+                        ay: -30,  // Point up from peak
+                        standoff: 3,  // Small gap to prevent arrow from being hidden by point
+                        font: { size: 12, color: 'red', weight: 'bold' },
+                        bgcolor: 'rgba(0,0,0,0.7)',
+                        bordercolor: 'red',
+                        borderwidth: 1,
+                        borderpad: 2
+                    });
+                }
+            });
+
+            // Add annotations for ALL troughs (not just historical) - aligned to BOTTOM of bandpass
+            troughIndices.forEach((idx, i) => {
+                if (idx >= 0 && idx < filteredDates.length && filteredDates[idx]) {
+                    const date = filteredDates[idx];
+                    const bandpassValue = scaledBandpass[idx];
+                    const formattedDate = formatDateShort(date);
+                    annotations.push({
+                        x: date,
+                        y: bandpassValue,  // Align to bandpass trough
+                        text: formattedDate,
+                        xref: 'x2',  // Attach to fixed bandpass x-axis
+                        yref: 'y2',  // Attach to fixed bandpass y-axis
+                        showarrow: true,
+                        arrowhead: 2,
+                        arrowsize: 1,
+                        arrowwidth: 1,
+                        arrowcolor: 'lime',
+                        ax: 0,
+                        ay: 40,  // Point down from trough (increased from 30)
+                        standoff: 3,  // Small gap to prevent arrow from being hidden by point
+                        font: { size: 12, color: 'lime', weight: 'bold' },
+                        bgcolor: 'rgba(0,0,0,0.7)',
+                        bordercolor: 'lime',
+                        borderwidth: 1,
+                        borderpad: 2
+                    });
+                }
+            });
+
+            // Add annotations for historical mid-cycles (last 6 before historical length)
+            const historicalMidCyclesToShow = 6;
+            const historicalMidCycles = midCycleIndices.filter(idx => idx < adjustedHistoricalLength).slice(-historicalMidCyclesToShow);
+
+            historicalMidCycles.forEach(idx => {
+                if (idx >= 0 && idx < filteredDates.length && filteredDates[idx]) {
+                    const date = filteredDates[idx];
+                    // Mid-cycles are at zero crossing of bandpass
+                    annotations.push({
+                        x: date,
+                        y: 0,  // Zero crossing of bandpass
+                        text: formatDateShort(date),
+                        xref: 'x2',  // Attach to fixed bandpass x-axis
+                        yref: 'y2',  // Attach to fixed bandpass y-axis
+                        showarrow: true,
+                        arrowhead: 2,
+                        arrowsize: 1,
+                        arrowwidth: 1,
+                        arrowcolor: 'orange',
+                        ax: 0,
+                        ay: -20,  // Point up from midline
+                        font: { size: 11, color: 'orange' },
+                        bgcolor: 'rgba(0,0,0,0.7)',
+                        bordercolor: 'orange',
+                        borderwidth: 1,
+                        borderpad: 2
+                    });
+                }
+            });
+
+            // Note: Peak and trough labels for ALL indices (historical + future)
+            // are now added in the sections above (lines 990-1042)
+            // These duplicate "future only" sections have been removed
+
+            // Add annotations for future mid-cycles (indices beyond historical data in filtered view)
+            midCycleIndices.forEach(idx => {
+                if (idx >= adjustedHistoricalLength && idx < filteredDates.length && filteredDates[idx]) {
+                    const date = filteredDates[idx];
+                    annotations.push({
+                        x: date,
+                        y: 0,  // Zero crossing of bandpass
+                        text: formatDateShort(date),
+                        xref: 'x2',  // Attach to fixed bandpass x-axis
+                        yref: 'y2',  // Attach to fixed bandpass y-axis
+                        showarrow: true,
+                        arrowhead: 2,
+                        arrowsize: 1,
+                        arrowwidth: 1,
+                        arrowcolor: 'orange',
+                        ax: 0,
+                        ay: -20,
+                        font: { size: 11, color: 'orange' },
+                        bgcolor: 'rgba(0,0,0,0.7)',
+                        bordercolor: 'orange',
+                        borderwidth: 1,
+                        borderpad: 2
+                    });
+                }
+            });
+
+            // Calculate date range: Show recent history + future projections
+            // Show the last 3 wavelengths of historical data (about 3-4 cycles back) + future projections
+            const endIdx = historicalLength;
+            const lookbackBars = Math.round(data.bandpass.wavelength * 3.5);  // Show ~3.5 cycles of history
+            const startIdx = Math.max(0, historicalLength - lookbackBars);
+            const defaultStartDate = filteredDates[startIdx];
+            // Show 2.5 wavelengths of future projection on the right
+            const defaultEndDate = filteredDates[Math.min(endIdx + Math.round(data.bandpass.wavelength * 2.5), filteredDates.length - 1)];
+
+            const layout = {
+                title: '',
+                paper_bgcolor: '#0a0a0a',
+                plot_bgcolor: '#0a0a0a',
+                font: { color: 'white' },
+                // Main axes for price (pannable/zoomable) - HIDDEN
+                xaxis: {
+                    showgrid: false,
+                    zeroline: false,
+                    gridcolor: 'rgba(0,0,0,0)',
+                    gridwidth: 0,
+                    color: 'rgba(255,255,255,0.3)',
+                    type: 'date',
+                    range: [defaultStartDate, defaultEndDate],
+                    rangeslider: { visible: false },
+                    fixedrange: false,
+                    showticklabels: false,  // Hide price axis labels
+                    showspikes: true,
+                    spikecolor: '#00FFFF',
+                    spikethickness: 1,
+                    spikedash: 'solid',
+                    spikemode: 'across',
+                    spikesnap: 'cursor'
+                },
+                yaxis: {
+                    showgrid: false,
+                    zeroline: false,
+                    gridcolor: 'rgba(0,0,0,0)',
+                    gridwidth: 0,
+                    color: 'rgba(255,255,255,0.3)',
+                    title: '',
+                    autorange: true,
+                    fixedrange: false,
+                    showticklabels: false  // Hide price values
+                },
+                // Secondary axes for bandpass (FIXED - no pan/zoom) - VISIBLE
+                xaxis2: {
+                    showgrid: false,
+                    zeroline: false,
+                    gridcolor: 'rgba(0,0,0,0)',
+                    gridwidth: 0,
+                    color: 'white',
+                    type: 'date',
+                    range: [defaultStartDate, defaultEndDate],
+                    overlaying: 'x',
+                    side: 'bottom',
+                    showticklabels: true,  // Show bandpass time labels
+                    fixedrange: true,
+                    showspikes: true,
+                    spikecolor: '#00FFFF',
+                    spikethickness: 1,
+                    spikedash: 'solid',
+                    spikemode: 'across',
+                    spikesnap: 'cursor'
+                },
+                yaxis2: {
+                    showgrid: true,
+                    zeroline: true,  // Show zero line
+                    zerolinecolor: 'rgba(255,255,255,0.3)',
+                    zerolinewidth: 1,
+                    gridcolor: 'rgba(255,255,255,0.1)',
+                    gridwidth: 1,
+                    color: 'white',
+                    title: 'Bandpass',
+                    range: [y2AxisMin, y2AxisMax],  // Bandpass range with 20% margins
+                    overlaying: 'y',
+                    side: 'left',
+                    showticklabels: true,  // Show bandpass values
+                    fixedrange: true
+                },
+                margin: { l: 60, r: 20, t: 10, b: 40 },
+                legend: { x: 0, y: 1 },
+                dragmode: 'pan', // Allow pan/zoom instead of pen
+                hovermode: 'x unified',  // Show vertical line on hover
+                hoverdistance: 100,
+                spikedistance: 100,
+                annotations: annotations
+            };
+
+
+            // Save annotations for bandpass toggle
+            savedAnnotations = annotations;
+
+            const config = {
+                responsive: true,
+                scrollZoom: false,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['select2d', 'lasso2d'],
+                edits: {
+                    axisTitleText: false,
+                    colorbarPosition: false,
+                    colorbarTitleText: false,
+                    legendPosition: false,
+                    legendText: false,
+                    shapePosition: false,
+                    annotationPosition: false,
+                    annotationTail: false,
+                    annotationText: false
+                }
+            };
+
+            // Assemble traces
+            const traces = [priceTrace, bandpassTrace, peaksTrace, troughsTrace, midCyclesTrace];
+
+            Plotly.newPlot('priceChart', traces, layout, config);
+
+            // Update phase indicator
+            updatePhaseIndicator(data);
+
+            // Add event listener to update annotations when price chart is panned/zoomed
+            const priceChartDiv = document.getElementById('priceChart');
+            priceChartDiv.on('plotly_relayout', function(eventData) {
+                // Only update annotations if x-axis range changed (pan/zoom)
+                if (eventData['xaxis.range[0]'] || eventData['xaxis.range']) {
+                    updateAnnotationsForPan();
+                }
+            });
+        }
+
+        function updateAnnotationsForPan() {
+            const priceChartDiv = document.getElementById('priceChart');
+            if (!priceChartDiv || !priceChartDiv.layout) return;
+
+            const xAxisRange = priceChartDiv.layout.xaxis.range;  // Current visible price range
+            const x2AxisRange = priceChartDiv.layout.xaxis2.range; // Fixed bandpass range
+
+            if (!xAxisRange || !x2AxisRange) return;
+
+            // Get current annotations
+            const currentAnnotations = priceChartDiv.layout.annotations || [];
+
+            // Update each annotation's date text based on current price position
+            const updatedAnnotations = currentAnnotations.map(ann => {
+                // Get the annotation's x value (bandpass date)
+                const annDate = new Date(ann.x);
+
+                // Calculate the offset between x and x2 ranges
+                const x2Start = new Date(x2AxisRange[0]).getTime();
+                const x2End = new Date(x2AxisRange[1]).getTime();
+                const xStart = new Date(xAxisRange[0]).getTime();
+                const xEnd = new Date(xAxisRange[1]).getTime();
+
+                // The annotation is at a fixed position in x2 coordinate space
+                // Find what fraction of x2 range it's at
+                const annTime = annDate.getTime();
+                const x2Fraction = (annTime - x2Start) / (x2End - x2Start);
+
+                // Find the corresponding date in the current x (price) range
+                const correspondingXTime = xStart + x2Fraction * (xEnd - xStart);
+                const correspondingXDate = new Date(correspondingXTime);
+
+                // Update the annotation text to show the price date at this position
+                // Keep the y coordinate the same (stays at bandpass peak/trough/zero)
+                // Check if date is valid before formatting
+                let dateText;
+                try {
+                    if (isNaN(correspondingXDate.getTime())) {
+                        dateText = ann.text; // Keep original if invalid
+                    } else {
+                        dateText = formatDateShort(correspondingXDate.toISOString().split('T')[0]);
+                    }
+                } catch (e) {
+                    dateText = ann.text; // Keep original on error
+                }
+
+                return {
+                    ...ann,
+                    text: dateText,
+                    // y stays the same - already at bandpass peak/trough/zero
+                };
+            });
+
+            // Update the chart with new annotations
+            Plotly.relayout('priceChart', { annotations: updatedAnnotations });
+        }
+
+        function updatePhaseIndicator(data) {
+            // Show/update the phase indicator with current cycle position
+            const phaseInfo = data.bandpass.phase_info;
+            if (!phaseInfo) return;
+
+            const phaseDegrees = phaseInfo.phase_degrees;
+            const wavelength = data.bandpass.wavelength;
+
+            // Calculate phase description and next turning point
+            let description, nextTurning, phaseColor;
+
+            // Normalize phase to 0-360
+            const normalizedPhase = ((phaseDegrees % 360) + 360) % 360;
+
+            // Calculate days to next peak (90°) and trough (270°)
+            let degreesToNextPeak = (90 - normalizedPhase + 360) % 360;
+            let degreesToNextTrough = (270 - normalizedPhase + 360) % 360;
+
+            const daysToNextPeak = Math.round(degreesToNextPeak * wavelength / 360);
+            const daysToNextTrough = Math.round(degreesToNextTrough * wavelength / 360);
+
+            // Determine which is closer and set description
+            if (daysToNextPeak < daysToNextTrough) {
+                // Peak is closer
+                if (daysToNextPeak <= wavelength / 8) {
+                    // Very close to peak (within 1/8 cycle)
+                    description = '📈 At Peak';
+                    phaseColor = '#ff4444';
+                } else if (daysToNextPeak <= wavelength / 4) {
+                    description = '📈 Approaching Peak';
+                    phaseColor = '#ff4444';
+                } else {
+                    description = '📈 Rising Phase';
+                    phaseColor = '#44ff88';
+                }
+                nextTurning = `Peak in ${daysToNextPeak} days, Trough in ${daysToNextTrough} days`;
+            } else {
+                // Trough is closer
+                if (daysToNextTrough <= wavelength / 8) {
+                    // Very close to trough
+                    description = '📊 At Trough';
+                    phaseColor = '#44ff44';
+                } else if (daysToNextTrough <= wavelength / 4) {
+                    description = '📉 Approaching Trough';
+                    phaseColor = '#44ff44';
+                } else {
+                    description = '📉 Declining Phase';
+                    phaseColor = '#ff8844';
+                }
+                nextTurning = `Trough in ${daysToNextTrough} days, Peak in ${daysToNextPeak} days`;
+            }
+
+            // Update the HTML in Quick Reference box
+            document.getElementById('phaseInfo').style.display = 'block';
+            document.getElementById('phaseDescription').textContent = description;
+            document.getElementById('phaseDescription').style.color = phaseColor;
+            document.getElementById('nextTurning').innerHTML = nextTurning;
+            document.getElementById('wavelengthInfo').innerHTML = `Wavelength: ${wavelength}d`;
+        }
+
+        function applyPhaseShift(values, shift) {
+            if (shift === 0) return values.slice(); // Return a copy, not reference
+
+            //Limit shift to array bounds to prevent discontinuities
+            const maxShift = Math.floor(values.length * 0.1); // Limit to 10% of array length
+            shift = Math.max(-maxShift, Math.min(maxShift, shift));
+
+            const result = new Array(values.length);
+            for (let i = 0; i < values.length; i++) {
+                const sourceIdx = i - shift;
+
+                // Use circular/wrap-around indexing for sine wave continuity
+                let wrappedIdx;
+                if (sourceIdx < 0) {
+                    // Wrap from beginning: use values from the end
+                    wrappedIdx = values.length + sourceIdx;
+                } else if (sourceIdx >= values.length) {
+                    // Wrap from end: use values from the beginning
+                    wrappedIdx = sourceIdx - values.length;
+                } else {
+                    wrappedIdx = sourceIdx;
+                }
+
+                result[i] = values[wrappedIdx];
+            }
+            return result;
+        }
+
+        function adjustPhaseShift(direction) {
+            if (!currentData) return;
+
+            priceChartPhaseShift += direction;
+            document.getElementById('phaseShiftValue').textContent = priceChartPhaseShift;
+
+            // Recreate entire chart with new shift
+            createPriceChart(currentData);
+        }
+
+        // Switch alignment mode with caching for instant switching
+        async function switchAlignment(newAlignment) {
+            // If no cycle is loaded, just update UI
+            if (!selectedCycle) {
+                updateAlignmentUI(newAlignment);
+                return;
+            }
+
+            // If clicking the already active button, do nothing
+            if (currentAlignment === newAlignment) {
+                return;
+            }
+
+            // Update UI immediately for instant feedback
+            updateAlignmentUI(newAlignment);
+
+            // Check if we have cached data for this wavelength + alignment
+            const cacheKey = `${selectedCycle}-${newAlignment}`;
+
+            if (alignmentCache[cacheKey]) {
+                // Instant switch from cache!
+                console.log(`Using cached data for ${cacheKey}`);
+                applyBandpassData(alignmentCache[cacheKey]);
+            } else {
+                // Need to fetch from API
+                console.log(`Fetching new data for ${cacheKey}`);
+                await loadBandpassForCycle(selectedCycle, newAlignment);
+            }
+        }
+
+        // Update alignment button UI
+        function updateAlignmentUI(alignment) {
+            currentAlignment = alignment;
+            document.getElementById('alignTo').value = alignment;
+
+            // Sync the manual bandpass phasing dropdown
+            document.getElementById('phasingMode').value = alignment;
+
+            // Update button active states
+            document.getElementById('alignToTrough').classList.toggle('active', alignment === 'trough');
+            document.getElementById('alignToPeak').classList.toggle('active', alignment === 'peak');
+        }
+
+        // Apply bandpass data to charts (extracted for reuse)
+        function applyBandpassData(data) {
+            currentData = data;
+
+            // Update all global variables
+            globalFilteredDates = data.price_history.dates || [];
+            globalFilteredPrices = data.price_history.prices || [];
+
+            if (data.bandpass && data.bandpass.scaled_values) {
+                const scaledValues = data.bandpass.scaled_values.map(v => v * globalBandpassScaleFactor);
+                globalScaledBandpass = scaledValues;
+                globalOriginalBandpass = [...scaledValues];
+            }
+
+            // Update peak/trough indices using mathematical calculation
+            if (data.bandpass && data.bandpass.wavelength) {
+                const wavelength = data.bandpass.wavelength;
+                const scaledBandpass = globalScaledBandpass;
+
+                // Calculate peaks mathematically
+                const peakIndices = [];
+                let firstPeakIdx = 0;
+                let maxVal = scaledBandpass[0];
+                for (let i = 1; i < Math.min(wavelength, scaledBandpass.length); i++) {
+                    if (scaledBandpass[i] > maxVal) {
+                        maxVal = scaledBandpass[i];
+                        firstPeakIdx = i;
+                    }
+                }
+                for (let i = firstPeakIdx; i < scaledBandpass.length; i += wavelength) {
+                    peakIndices.push(Math.round(i));
+                }
+
+                // Calculate troughs mathematically
+                const troughIndices = [];
+                let firstTroughIdx = 0;
+                let minVal = scaledBandpass[0];
+                for (let i = 1; i < Math.min(wavelength, scaledBandpass.length); i++) {
+                    if (scaledBandpass[i] < minVal) {
+                        minVal = scaledBandpass[i];
+                        firstTroughIdx = i;
+                    }
+                }
+                for (let i = firstTroughIdx; i < scaledBandpass.length; i += wavelength) {
+                    troughIndices.push(Math.round(i));
+                }
+
+                globalPeakIndices = peakIndices;
+                globalTroughIndices = troughIndices;
+            }
+
+            // Reset phase shift
+            priceChartPhaseShift = 0;
+
+            // Recreate chart
+            createPriceChart(data);
+        }
+
+        function resetPhaseShift() {
+            if (!currentData) return;
+
+            priceChartPhaseShift = 0;
+
+            // Recreate entire chart with shift=0
+            createPriceChart(currentData);
+        }
+
+        // Moving Average Functions
+        function calculateSMA(prices, length) {
+            const sma = [];
+            for (let i = 0; i < prices.length; i++) {
+                if (i < length - 1) {
+                    // Return NaN instead of null - cleaner for Plotly
+                    sma.push(NaN);
+                } else {
+                    let sum = 0;
+                    for (let j = 0; j < length; j++) {
+                        sum += prices[i - j];
+                    }
+                    sma.push(sum / length);
+                }
+            }
+            return sma;
+        }
+
+        function calculateEMA(prices, length) {
+            const ema = [];
+            const multiplier = 2 / (length + 1);
+
+            // Fill initial NaNs for first (length-1) values
+            for (let i = 0; i < length - 1; i++) {
+                ema.push(NaN);
+            }
+
+            // First EMA value is SMA at position (length-1)
+            let sum = 0;
+            for (let i = 0; i < length; i++) {
+                sum += prices[i];
+            }
+            ema.push(sum / length);
+
+            // Calculate EMA for remaining values
+            for (let i = length; i < prices.length; i++) {
+                const value = (prices[i] - ema[ema.length - 1]) * multiplier + ema[ema.length - 1];
+                ema.push(value);
+            }
+
+            return ema;
+        }
+
+        function applyMA() {
+            if (!currentData) return;
+
+            const maType = document.getElementById('maType').value;
+            const maLength = parseInt(document.getElementById('maLength').value);
+
+            globalMaType = maType;
+            globalMaLength = maLength;
+
+            // Calculate MA only up to current bar (historical length), not future projection
+            const historicalPrices = globalFilteredPrices.slice(0, globalAdjustedHistoricalLength);
+
+            let maValues;
+            if (maType === 'SMA') {
+                maValues = calculateSMA(historicalPrices, maLength);
+            } else {
+                maValues = calculateEMA(historicalPrices, maLength);
+            }
+
+            // Pad with NaN for future bars so arrays align
+            const futureLength = globalFilteredPrices.length - globalAdjustedHistoricalLength;
+            globalMaValues = maValues.concat(new Array(futureLength).fill(NaN));
+
+            // Reset phase shift
+            maPhaseShift = 0;
+
+            // Update chart
+            updateMATrace();
+        }
+
+        function adjustMAPhase(direction) {
+            if (!currentData || globalMaValues.length === 0) return;
+
+            maPhaseShift += direction;
+
+            updateMATrace();
+        }
+
+        function resetMAPhase() {
+            if (!currentData || globalMaValues.length === 0) return;
+
+            maPhaseShift = 0;
+
+            updateMATrace();
+        }
+
+        function toggleMA() {
+            if (!currentData || globalMaValues.length === 0) return;
+
+            maVisible = !maVisible;
+            const button = document.getElementById('toggleMA');
+            button.textContent = maVisible ? 'Hide MA' : 'Show MA';
+
+            updateMATrace();
+        }
+
+        function toggleBandpass() {
+            if (!currentData) return;
+
+            bandpassVisible = !bandpassVisible;
+            const button = document.getElementById('toggleBandpass');
+            button.textContent = bandpassVisible ? 'Hide Bandpass' : 'Show Bandpass';
+
+            const priceChartDiv = document.getElementById('priceChart');
+            if (!priceChartDiv || !priceChartDiv.data) return;
+
+            // Hide/show bandpass trace (named "Bandpass (XXXd)")
+            for (let i = 0; i < priceChartDiv.data.length; i++) {
+                if (priceChartDiv.data[i].name && priceChartDiv.data[i].name.startsWith('Bandpass')) {
+                    Plotly.restyle('priceChart', { visible: bandpassVisible }, [i]);
+                    break;
+                }
+            }
+
+            // Hide/show peak/trough/mid-cycle markers
+            const markerNames = ['Peaks', 'Troughs', 'Mid-Cycles'];
+            for (let i = 0; i < priceChartDiv.data.length; i++) {
+                if (priceChartDiv.data[i].name && markerNames.includes(priceChartDiv.data[i].name)) {
+                    Plotly.restyle('priceChart', { visible: bandpassVisible }, [i]);
+                }
+            }
+
+            // Hide/show annotations (date labels)
+            if (bandpassVisible) {
+                // Show annotations - restore from saved
+                Plotly.relayout('priceChart', { annotations: savedAnnotations });
+            } else {
+                // Hide annotations by setting them to empty array
+                Plotly.relayout('priceChart', { annotations: [] });
+            }
+        }
+
+        function updateMATrace() {
+            if (!currentData || globalMaValues.length === 0) return;
+
+            // Apply phase shift to MA
+            let shiftedMA = maPhaseShift === 0
+                ? globalMaValues.slice()
+                : applyPhaseShift(globalMaValues, maPhaseShift);
+
+            // Plotly automatically handles NaN values by not drawing them
+            // So we don't need to filter - just pass the full arrays
+            const maTrace = {
+                x: maVisible ? globalFilteredDates : [],
+                y: maVisible ? shiftedMA : [],
+                type: 'scatter',
+                mode: 'lines',
+                name: `${globalMaType}(${globalMaLength})`,
+                line: { color: '#00FFFF', width: 0.5 },
+                xaxis: 'x',
+                yaxis: 'y',
+                connectgaps: false  // Don't connect across NaN gaps
+            };
+
+            // Check if trace 5 exists (MA trace)
+            const priceChartDiv = document.getElementById('priceChart');
+            if (priceChartDiv.data && priceChartDiv.data.length > 5) {
+                // Update existing MA trace
+                Plotly.restyle('priceChart', {
+                    x: [maTrace.x],
+                    y: [maTrace.y],
+                    name: [maTrace.name],
+                    'line.color': maTrace.line.color,
+                    'line.width': maTrace.line.width
+                }, [5]);
+            } else {
+                // Add new MA trace
+                Plotly.addTraces('priceChart', maTrace);
+            }
+        }
+
+        function toggleVerticalLines(type) {
+            if (!currentData) return;
+
+            // Get current layout - use a deep copy of shapes
+            const priceChartDiv = document.getElementById('priceChart');
+            let shapes = priceChartDiv.layout && priceChartDiv.layout.shapes ? [...priceChartDiv.layout.shapes] : [];
+
+            // Toggle visibility based on type
+            if (type === 'peaks') {
+                peakLinesVisible = !peakLinesVisible;
+                const button = document.getElementById('togglePeakLines');
+                button.style.opacity = peakLinesVisible ? '1' : '0.5';
+
+                if (peakLinesVisible) {
+                    // Add vertical lines at all peaks
+                    const allPeaks = [...globalHistoricalPeaks, ...globalPeakIndices.filter(idx => idx >= globalAdjustedHistoricalLength)];
+                    allPeaks.forEach(idx => {
+                        if (idx >= 0 && idx < globalFilteredDates.length) {
+                            shapes.push({
+                                type: 'line',
+                                x0: globalFilteredDates[idx],
+                                x1: globalFilteredDates[idx],
+                                xref: 'x2',  // Attach to fixed bandpass x-axis
+                                y0: 0,
+                                y1: 1,
+                                yref: 'paper',
+                                line: {
+                                    color: '#ff4444',
+                                    width: 1,
+                                    dash: 'dot'
+                                },
+                                name: 'peak_line'
+                            });
+                        }
+                    });
+                } else {
+                    // Remove peak lines
+                    shapes = shapes.filter(s => s.name !== 'peak_line');
+                }
+            } else if (type === 'troughs') {
+                troughLinesVisible = !troughLinesVisible;
+                const button = document.getElementById('toggleTroughLines');
+                button.style.opacity = troughLinesVisible ? '1' : '0.5';
+
+                if (troughLinesVisible) {
+                    // Add vertical lines at all troughs
+                    const allTroughs = [...globalHistoricalTroughs, ...globalTroughIndices.filter(idx => idx >= globalAdjustedHistoricalLength)];
+                    allTroughs.forEach(idx => {
+                        if (idx >= 0 && idx < globalFilteredDates.length) {
+                            shapes.push({
+                                type: 'line',
+                                x0: globalFilteredDates[idx],
+                                x1: globalFilteredDates[idx],
+                                xref: 'x2',  // Attach to fixed bandpass x-axis
+                                y0: 0,
+                                y1: 1,
+                                yref: 'paper',
+                                line: {
+                                    color: '#44ff44',
+                                    width: 1,
+                                    dash: 'dot'
+                                },
+                                name: 'trough_line'
+                            });
+                        }
+                    });
+                } else {
+                    // Remove trough lines
+                    shapes = shapes.filter(s => s.name !== 'trough_line');
+                }
+            } else if (type === 'midcycles') {
+                midCycleLinesVisible = !midCycleLinesVisible;
+                const button = document.getElementById('toggleMidCycleLines');
+                button.style.opacity = midCycleLinesVisible ? '1' : '0.5';
+
+                if (midCycleLinesVisible) {
+                    // Add vertical lines at all mid-cycles
+                    globalMidCycleIndices.forEach(idx => {
+                        if (idx >= 0 && idx < globalFilteredDates.length) {
+                            shapes.push({
+                                type: 'line',
+                                x0: globalFilteredDates[idx],
+                                x1: globalFilteredDates[idx],
+                                xref: 'x2',  // Attach to fixed bandpass x-axis
+                                y0: 0,
+                                y1: 1,
+                                yref: 'paper',
+                                line: {
+                                    color: '#ffaa44',
+                                    width: 1,
+                                    dash: 'dot'
+                                },
+                                name: 'midcycle_line'
+                            });
+                        }
+                    });
+                } else {
+                    // Remove mid-cycle lines
+                    shapes = shapes.filter(s => s.name !== 'midcycle_line');
+                }
+            }
+
+            // Update chart with new shapes
+            Plotly.relayout('priceChart', { shapes: shapes });
+        }
+
+        function createHeatmapChart(data) {
+            // Backend sends [week][wavelength], but Plotly needs [wavelength][week]
+            // Transpose: for each wavelength, get all weeks' values
+            // REVERSE the time axis so current data (week 0) appears on the LEFT
+            const heatmapFlipped = data.heatmap.wavelengths.map((_, wlIndex) =>
+                data.heatmap.data.map(weekData => weekData[wlIndex]).reverse()
+            );
+
+            const heatmapTrace = {
+                z: heatmapFlipped,
+                y: data.heatmap.wavelengths,  // CRITICAL: Map rows to actual wavelength values
+                type: 'heatmap',
+                colorscale: [
+                    [0, '#000000'],
+                    [0.15, '#1a0033'],
+                    [0.30, '#330066'],
+                    [0.50, '#6600cc'],
+                    [0.70, '#9933ff'],
+                    [0.85, '#cc66ff'],
+                    [1, '#ffffff']
+                ],
+                zmin: 0,
+                zmax: 1.0,  // Match global normalization (max = 1.0)
+                showscale: false
+            };
+
+            // Dynamic cycle labeling based on actual peak_cycles data
+            const annotations = [];
+            // REMOVED threshold - show ALL cycles regardless of amplitude
+
+            // Get totalWeeks early for annotation positioning
+            const totalWeeks = data.heatmap.weeks;
+
+            // Get wavelength range and step from actual data
+            const wavelengthStep = data.heatmap.wavelengths.length > 1 ?
+                data.heatmap.wavelengths[1] - data.heatmap.wavelengths[0] : 5;
+
+            // Label all peaks from the analysis (no amplitude filter)
+            data.peak_cycles.forEach(cycle => {
+                // Show all cycles, even weak ones
+
+                // Find the exact wavelength index in heatmap data
+                const wavelengthIndex = data.heatmap.wavelengths.findIndex(w =>
+                    Math.abs(w - cycle.wavelength) < (wavelengthStep / 2)
+                );
+                if (wavelengthIndex === -1) return; // Wavelength not in range
+
+                // Create triangle on RIGHT side, pointing LEFT to the bright band
+                annotations.push({
+                    x: totalWeeks + 0.5,  // Triangle on the right margin
+                    y: cycle.wavelength,  // Use actual wavelength value, not index
+                    text: '◄',  // Triangle pointing left (toward the bright band)
+                    showarrow: false,
+                    font: {
+                        color: 'yellow',
+                        size: 16,
+                        family: 'Arial, sans-serif'
+                    },
+                    xanchor: 'center',
+                    yanchor: 'middle',
+                    xref: 'x',
+                    yref: 'y'
+                });
+
+                // Create label box to the right of the triangle
+                annotations.push({
+                    x: totalWeeks + 2,  // Position to the right in the margin
+                    y: cycle.wavelength,  // Use actual wavelength value, not index
+                    text: Math.round(cycle.wavelength).toString(),  // Actual cycle wavelength
+                    showarrow: false,
+                    font: {
+                        color: 'yellow',
+                        size: 11,
+                        family: 'Arial, sans-serif',
+                        weight: 'bold'
+                    },
+                    bgcolor: 'rgba(0,0,0,0.9)',
+                    bordercolor: 'yellow',
+                    borderwidth: 1,
+                    borderpad: 3,
+                    xanchor: 'left',  // Anchor to left side
+                    yanchor: 'middle',
+                    xref: 'x',
+                    yref: 'y'
+                });
+            });
+
+            // Calculate year tick marks for time axis
+            const currentYear = new Date().getFullYear();
+            const startYear = currentYear - Math.floor(totalWeeks * 5 / 252);  // 5 trading days/week, 252 trading days/year
+
+            const yearTicks = [];
+            const yearLabels = [];
+
+            // Create tick marks for each year
+            for (let year = startYear; year <= currentYear; year++) {
+                const weeksFromStart = (year - startYear) * 252 / 5;  // 252 trading days/year ÷ 5 trading days/week
+                if (weeksFromStart >= 0 && weeksFromStart <= totalWeeks) {
+                    yearTicks.push(weeksFromStart);
+                    yearLabels.push(year.toString());
+                }
+            }
+
+            const layout = {
+                title: '',
+                paper_bgcolor: '#0a0a0a',
+                plot_bgcolor: '#0a0a0a',
+                font: { color: 'white' },
+                xaxis: {
+                    title: 'Time',
+                    color: 'white',
+                    tickmode: 'array',
+                    tickvals: yearTicks,
+                    ticktext: yearLabels,
+                    range: [0, totalWeeks + 3]  // Extend to include annotation area
+                },
+                yaxis: {
+                    title: 'Wavelength',
+                    color: 'white',
+                    tickmode: 'array',
+                    tickvals: (() => {
+                        const minWl = Math.min(...data.heatmap.wavelengths);
+                        const maxWl = Math.max(...data.heatmap.wavelengths);
+                        const numTicks = 8;
+                        const step = (maxWl - minWl) / numTicks;
+                        // Return actual wavelength values, not indices
+                        return Array.from({length: numTicks + 1}, (_, i) => Math.round(minWl + i * step));
+                    })(),
+                    ticktext: (() => {
+                        const minWl = Math.min(...data.heatmap.wavelengths);
+                        const maxWl = Math.max(...data.heatmap.wavelengths);
+                        const numTicks = 8;
+                        const step = (maxWl - minWl) / numTicks;
+                        return Array.from({length: numTicks + 1}, (_, i) => Math.round(minWl + i * step).toString());
+                    })()
+                },
+                margin: { l: 60, r: 120, t: 30, b: 50 },  // Increased right margin for cycle labels
+                annotations: annotations
+            };
+
+            Plotly.newPlot('heatmapChart', [heatmapTrace], layout, {responsive: true});
+
+        }
+
+        function createHeatmapPowerSpectrum(data) {
+            const powerTrace = {
+                x: data.power_spectrum.amplitudes,
+                y: data.power_spectrum.wavelengths,
+                type: 'scatter',
+                mode: 'lines',
+                fill: 'tozerox',
+                name: '',
+                line: { color: '#9933ff', width: 2 },
+                fillcolor: 'rgba(153, 51, 255, 0.4)',
+                showscale: false
+            };
+
+            // Add peak markers with labels
+            const peakTraces = [];
+            data.peak_cycles.slice(0, 8).forEach((cycle, index) => {
+                peakTraces.push({
+                    x: [cycle.amplitude, cycle.amplitude],
+                    y: [cycle.wavelength, cycle.wavelength],
+                    type: 'scatter',
+                    mode: 'markers+text',
+                    marker: {
+                        color: 'yellow',
+                        size: 8,
+                        symbol: 'circle'
+                    },
+                    text: [cycle.wavelength.toString()],
+                    textposition: 'middle right',
+                    textfont: {
+                        color: 'yellow',
+                        size: 9
+                    },
+                    showlegend: false
+                });
+            });
+
+            const layout = {
+                title: '',
+                paper_bgcolor: '#0a0a0a',
+                plot_bgcolor: '#0a0a0a',
+                font: { color: 'white' },
+                xaxis: {
+                    title: '',
+                    color: 'white',
+                    showticklabels: false,
+                    showgrid: false
+                },
+                yaxis: {
+                    title: '',
+                    color: 'white',
+                    range: [data.power_spectrum.wavelengths[0], data.power_spectrum.wavelengths[data.power_spectrum.wavelengths.length-1]],
+                    showticklabels: false,
+                    showgrid: false
+                },
+                margin: { l: 10, r: 10, t: 10, b: 10 },
+                showlegend: false
+            };
+
+            Plotly.newPlot('heatmapPowerSpectrum', [powerTrace, ...peakTraces], layout, {responsive: true});
+        }
+
+        function createPowerSpectrumChart(data) {
+            // Create thin vertical lines for sharp peaks
+            const traces = [];
+
+            // Find the maximum amplitude for scaling
+            const maxAmplitude = Math.max(...data.power_spectrum.amplitudes);
+
+            // Display all bars (dense spectrum)
+            const sampleStep = 1;  // Show every wavelength
+
+            for (let i = 0; i < data.power_spectrum.wavelengths.length; i += sampleStep) {
+                const wavelength = data.power_spectrum.wavelengths[i];
+                const amplitude = data.power_spectrum.amplitudes[i];
+                const normalizedHeight = amplitude / maxAmplitude;
+
+                // Balanced non-linear scaling: Make peaks sharp while keeping all cycles visible
+                // Target: 345d(1.0)→1.0, 470d(0.98)→0.95, 605d(0.60)→0.20, smaller peaks→0.05+
+                let exaggeratedHeight;
+                if (normalizedHeight >= 0.92) {
+                    // Top peaks: preserve at full height
+                    exaggeratedHeight = 0.88 + (normalizedHeight - 0.92) * 1.5;  // 0.92→0.88, 1.0→1.0
+                } else if (normalizedHeight >= 0.75) {
+                    // Upper range: gentle slope
+                    const t = (normalizedHeight - 0.75) / 0.17;
+                    exaggeratedHeight = 0.55 + Math.pow(t, 2.0) * 0.33;  // 0.75→0.55, 0.92→0.88
+                } else if (normalizedHeight >= 0.50) {
+                    // Mid range: moderate compression
+                    const t = (normalizedHeight - 0.50) / 0.25;
+                    exaggeratedHeight = 0.20 + Math.pow(t, 3.0) * 0.35;  // 0.50→0.20, 0.75→0.55
+                } else {
+                    // Lower range: compress but keep visible
+                    exaggeratedHeight = Math.pow(normalizedHeight / 0.50, 5.0) * 0.20;  // 0→0, 0.50→0.20
+                }
+
+                let lineColor;
+                if (normalizedHeight > 0.85) {
+                    lineColor = '#ffffff'; // White for highest peaks
+                } else if (normalizedHeight > 0.70) {
+                    lineColor = '#ffff00'; // Yellow for high peaks
+                } else if (normalizedHeight > 0.50) {
+                    lineColor = '#ff9900'; // Orange for medium-high peaks
+                } else if (normalizedHeight > 0.35) {
+                    lineColor = '#ff6600'; // Orange-red for medium peaks
+                } else if (normalizedHeight > 0.20) {
+                    lineColor = '#cc3366'; // Pink for low-medium
+                } else if (normalizedHeight > 0.10) {
+                    lineColor = '#7733aa'; // Purple for low
+                } else if (normalizedHeight > 0.05) {
+                    lineColor = '#442266'; // Dark purple for very low
+                } else {
+                    lineColor = '#221133'; // Very dark for troughs
+                }
+
+                traces.push({
+                    x: [wavelength, wavelength],
+                    y: [0, exaggeratedHeight],  // Use exaggerated height for display
+                    type: 'scatter',
+                    mode: 'lines',
+                    line: {
+                        color: lineColor,
+                        width: 4  // Medium bars for ~140 bars
+                    },
+                    showlegend: false,
+                    hoverinfo: 'skip'
+                });
+            }
+
+            // Add peak labels: detect local maxima in the exaggerated spectrum
+            // Use backend-provided labeled peaks for consistency with cycle cards (no client-side detection)
+            const labeledPeaks = data.power_spectrum.labeled_peaks || [];
+
+            for (const wavelength of labeledPeaks) {
+                // Find this wavelength in the spectrum
+                const idx = data.power_spectrum.wavelengths.findIndex(wl => wl === wavelength);
+                if (idx === -1) continue;
+
+                const amplitude = data.power_spectrum.amplitudes[idx];
+                const normalizedHeight = amplitude / maxAmplitude;
+
+                // Calculate exaggerated height (same logic as above)
+                let exaggeratedHeight;
+                if (normalizedHeight >= 0.92) {
+                    exaggeratedHeight = 0.88 + (normalizedHeight - 0.92) * 1.5;
+                } else if (normalizedHeight >= 0.75) {
+                    const t = (normalizedHeight - 0.75) / 0.17;
+                    exaggeratedHeight = 0.55 + Math.pow(t, 2.0) * 0.33;
+                } else if (normalizedHeight >= 0.50) {
+                    const t = (normalizedHeight - 0.50) / 0.25;
+                    exaggeratedHeight = 0.20 + Math.pow(t, 3.0) * 0.35;
+                } else {
+                    exaggeratedHeight = Math.pow(normalizedHeight / 0.50, 5.0) * 0.20;
+                }
+
+                // Add label for this peak (no distance check needed - backend already filtered)
+                traces.push({
+                    x: [wavelength],
+                    y: [exaggeratedHeight + 0.05],
+                    mode: 'text',
+                    text: [Math.round(wavelength).toString()],
+                    textposition: 'top center',
+                    textfont: {
+                        color: 'yellow',
+                        size: 11,
+                        family: 'Arial, bold'
+                    },
+                    showlegend: false,
+                    hoverinfo: 'none'
+                });
+            }
+
+            const layout = {
+                title: '',
+                paper_bgcolor: '#0a0a0a',
+                plot_bgcolor: '#0a0a0a',
+                font: { color: 'white' },
+                xaxis: {
+                    title: 'Wavelength',
+                    gridcolor: '#333',
+                    color: 'white'
+                },
+                yaxis: {
+                    title: 'Amplitude',
+                    gridcolor: '#333',
+                    color: 'white',
+                    range: [0, 1.15] // Extra space for labels
+                },
+                margin: { l: 50, r: 50, t: 60, b: 50 }, // Increased top margin for labels
+                showlegend: false
+            };
+
+            Plotly.newPlot('powerSpectrumChart', traces, layout, {responsive: true});
+        }
+
+        async function loadBandpassForCycle(wavelength, alignment = null) {
+            // Use specified alignment or current alignment
+            const alignmentToUse = alignment || currentAlignment;
+
+            showStatus(`Loading bandpass for ${wavelength}d cycle (${alignmentToUse})...`, 'loading');
+
+            try {
+                const params = new URLSearchParams({
+                    symbol: document.getElementById('symbol').value.toUpperCase(),
+                    window_size: document.getElementById('windowSize').value,
+                    min_wavelength: document.getElementById('minWavelength').value,
+                    max_wavelength: document.getElementById('maxWavelength').value,
+                    wavelength_step: document.getElementById('wavelengthStep').value,
+                    align_to: alignmentToUse,
+                    bandpass_phase_method: 'actual_price_peaks',
+                    selected_wavelength: wavelength,
+                    _t: Date.now()
+                });
+
+                const response = await fetch(`/api/bandpass?${params}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    selectedCycle = wavelength;
+
+                    // Update manual controls with current bandpass parameters
+                    document.getElementById('manualWavelength').value = wavelength;
+                    document.getElementById('manualBandwidth').value = data.bandpass.bandwidth || 0.10;
+
+                    // Create properly structured data for caching
+                    const bandpassData = {
+                        ...currentData,
+                        bandpass: data.bandpass,
+                        price_data: data.price_data,
+                        price_history: {
+                            dates: data.price_data?.dates || [],
+                            prices: data.price_data?.prices || []
+                        },
+                        peaks: data.peaks,
+                        troughs: data.troughs
+                        // composite_bandpass: keep existing from currentData
+                    };
+
+                    // Cache this data
+                    const cacheKey = `${wavelength}-${alignmentToUse}`;
+                    alignmentCache[cacheKey] = bandpassData;
+                    console.log(`Cached data for ${cacheKey}`);
+
+                    // Apply the bandpass data
+                    applyBandpassData(bandpassData);
+
+                    // Update cycles list selection
+                    updateCyclesListSelection();
+
+                    showStatus(`Bandpass loaded for ${wavelength}d cycle!`, 'success');
+                    setTimeout(hideStatus, 2000);
+                } else {
+                    showStatus(`Error loading bandpass: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function applyManualBandpass() {
+            const wavelength = parseFloat(document.getElementById('manualWavelength').value);
+            const bandwidth = parseFloat(document.getElementById('manualBandwidth').value);
+
+            if (isNaN(wavelength) || wavelength < 20 || wavelength > 3000) {
+                showStatus('Wavelength must be between 20 and 3000', 'error');
+                return;
+            }
+
+            if (isNaN(bandwidth) || bandwidth < 0.01 || bandwidth > 0.50) {
+                showStatus('Bandwidth must be between 0.01 and 0.50', 'error');
+                return;
+            }
+
+            showStatus(`Loading bandpass with λ=${wavelength}d, BW=${bandwidth}...`, 'loading');
+
+            try {
+                const params = new URLSearchParams({
+                    symbol: document.getElementById('symbol').value.toUpperCase(),
+                    window_size: document.getElementById('windowSize').value,
+                    min_wavelength: document.getElementById('minWavelength').value,
+                    max_wavelength: document.getElementById('maxWavelength').value,
+                    wavelength_step: document.getElementById('wavelengthStep').value,
+                    align_to: document.getElementById('phasingMode').value,
+                    bandpass_phase_method: 'actual_price_peaks',
+                    selected_wavelength: wavelength,
+                    bandwidth: bandwidth,
+                    _t: Date.now()
+                });
+
+                const response = await fetch(`/api/bandpass?${params}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    selectedCycle = wavelength;
+
+                    // Update currentData with new bandpass and price_data
+                    currentData = {
+                        ...currentData,
+                        bandpass: data.bandpass,
+                        price_data: data.price_data,
+                        peaks: data.peaks,
+                        troughs: data.troughs
+                    };
+
+                    // Update price chart bandpass overlay
+                    createPriceChart(currentData);
+
+                    // Update cycles list selection (if it exists in the list)
+                    updateCyclesListSelection();
+
+                    showStatus(`Custom bandpass applied!`, 'success');
+                    setTimeout(hideStatus, 2000);
+                } else {
+                    showStatus(`Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function exportCycleData() {
+            if (!currentData || !selectedCycle) {
+                showStatus('Please select a cycle first', 'error');
+                setTimeout(hideStatus, 2000);
+                return;
+            }
+
+            showStatus('Exporting cycle data...', 'loading');
+
+            const symbol = document.getElementById('symbol').value.toUpperCase();
+
+            // Format date as ddMmmyy (e.g., 07Oct25)
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const month = monthNames[now.getMonth()];
+            const year = String(now.getFullYear()).slice(-2);
+            const dateStr = `${day}${month}${year}`;
+
+            // Get cycle quality metrics
+            const currentCycle = allCyclesData.find(c => c.wavelength === selectedCycle);
+
+            // Build markdown content
+            let markdown = `# Cycle Analysis Report\n\n`;
+            markdown += `**Symbol:** ${symbol}\n`;
+            markdown += `**Wavelength:** ${selectedCycle} trading days\n`;
+            markdown += `**Generated:** ${now.toLocaleDateString()} ${now.toLocaleTimeString()}\n\n`;
+
+            // Cycle Quality Metrics
+            if (currentCycle) {
+                markdown += `## Cycle Quality Metrics\n\n`;
+
+                const rating = currentCycle.rating || {};
+                markdown += `- **Rating:** ${rating.class || 'N/A'}\n`;
+
+                const quality = currentCycle.quality_v12 || {};
+                markdown += `- **Quality:** ${quality.star_display || 'N/A'}\n`;
+
+                const componentYield = currentCycle.component_yield || {};
+                if (componentYield.yield_percent !== undefined) {
+                    markdown += `- **Yield:** ${componentYield.yield_percent}%\n`;
+                }
+
+                const syncInfo = currentCycle.sync_info || {};
+                const syncDirection = syncInfo.is_rising ? 'Rising' : 'Falling';
+                const numAligned = syncInfo.num_aligned || 0;
+                const alignmentConf = syncInfo.alignment_confidence || 'N/A';
+                markdown += `- **Sync:** ${syncDirection}, ${numAligned} aligned (${alignmentConf})\n`;
+
+                const health = currentCycle.health || {};
+                const healthScore = health.score !== undefined ? health.score : 'N/A';
+                const healthStatus = health.status || 'Unknown';
+                markdown += `- **Health:** ${healthScore}/100 (${healthStatus})\n`;
+
+                if (currentCycle.amplitude !== undefined) {
+                    markdown += `- **Amplitude:** ${currentCycle.amplitude.toFixed(2)}\n`;
+                }
+
+                markdown += `\n`;
+            }
+
+            // Bandpass Information
+            if (currentData.bandpass) {
+                markdown += `## Bandpass Filter\n\n`;
+                const bandpass = currentData.bandpass;
+                if (bandpass.bandwidth !== undefined) {
+                    markdown += `- **Bandwidth:** ${bandpass.bandwidth}\n`;
+                }
+                if (bandpass.wavelength !== undefined) {
+                    markdown += `- **Center Wavelength:** ${bandpass.wavelength} days\n`;
+                }
+                markdown += `\n`;
+            }
+
+            // Current Phase
+            if (currentData.bandpass) {
+                markdown += `## Current Phase\n\n`;
+                const phaseDesc = document.getElementById('phaseDescription')?.textContent || 'N/A';
+                const nextTurning = document.getElementById('nextTurning')?.textContent || 'N/A';
+                markdown += `- **Phase:** ${phaseDesc}\n`;
+                markdown += `- **Next Turning:** ${nextTurning}\n\n`;
+            }
+
+            // Extract turning points from chart layout
+            const priceChart = document.getElementById('priceChart');
+            const layout = priceChart?.layout || {};
+            const annotations = layout.annotations || [];
+
+            const turningPoints = [];
+
+            // Extract from annotations (which have the dates displayed on the chart)
+            annotations.forEach(ann => {
+                if (!ann.text) return;
+
+                const date = ann.text;
+                // Determine type by arrow color
+                if (ann.arrowcolor === 'red') {
+                    turningPoints.push({ date, type: 'PEAK' });
+                } else if (ann.arrowcolor === 'lime') {
+                    turningPoints.push({ date, type: 'TROUGH' });
+                } else if (ann.arrowcolor === 'orange') {
+                    turningPoints.push({ date, type: 'MID-CYCLE' });
+                }
+            });
+
+            // Sort by date
+            turningPoints.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            // Add turning points table
+            markdown += `## Historical & Projected Turning Points\n\n`;
+            if (turningPoints.length > 0) {
+                markdown += `| Date | Type |\n`;
+                markdown += `|------|------|\n`;
+                turningPoints.forEach(point => {
+                    markdown += `| ${point.date} | ${point.type} |\n`;
+                });
+            } else {
+                markdown += `No turning points data available\n`;
+            }
+
+            // Download markdown file
+            const mdBlob = new Blob([markdown], { type: 'text/markdown' });
+            const mdUrl = URL.createObjectURL(mdBlob);
+            const mdLink = document.createElement('a');
+            mdLink.href = mdUrl;
+            mdLink.download = `${symbol}_${selectedCycle}d_${dateStr}.md`;
+            mdLink.click();
+            URL.revokeObjectURL(mdUrl);
+
+            // Export PNG images
+            try {
+                // Price Chart
+                const priceChartElement = document.getElementById('priceChart');
+                const priceImgData = await Plotly.toImage(priceChartElement, {
+                    format: 'png',
+                    width: 1600,
+                    height: 800
+                });
+                const priceLink = document.createElement('a');
+                priceLink.href = priceImgData;
+                priceLink.download = `${symbol}_Chart_${dateStr}.png`;
+                priceLink.click();
+
+                // Power Spectrum
+                const spectrumElement = document.getElementById('powerSpectrumChart');
+                const spectrumImgData = await Plotly.toImage(spectrumElement, {
+                    format: 'png',
+                    width: 1600,
+                    height: 800
+                });
+                const spectrumLink = document.createElement('a');
+                spectrumLink.href = spectrumImgData;
+                spectrumLink.download = `${symbol}_Spectrum_${dateStr}.png`;
+                spectrumLink.click();
+
+                // Heatmap
+                const heatmapElement = document.getElementById('heatmapChart');
+                const heatmapImgData = await Plotly.toImage(heatmapElement, {
+                    format: 'png',
+                    width: 1600,
+                    height: 800
+                });
+                const heatmapLink = document.createElement('a');
+                heatmapLink.href = heatmapImgData;
+                heatmapLink.download = `${symbol}_Heatmap_${dateStr}.png`;
+                heatmapLink.click();
+
+                showStatus('Data exported successfully!', 'success');
+                setTimeout(hideStatus, 2000);
+            } catch (error) {
+                console.error('Error exporting images:', error);
+                showStatus('Error exporting images', 'error');
+                setTimeout(hideStatus, 3000);
+            }
+        }
+
+        function updateCyclesListSelection() {
+            const items = document.querySelectorAll('.cycle-item');
+            items.forEach((item, index) => {
+                const wavelength = parseInt(item.getAttribute('data-wavelength'));
+                if (wavelength === selectedCycle) {
+                    item.classList.add('selected');
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+        }
+
+        function createCyclesList(cycles, defaultSelectedCycle) {
+            const list = document.getElementById('cyclesList');
+            list.innerHTML = cycles.map(cycle => {
+                const rating = cycle.rating || {};
+                const qualityV12 = cycle.quality_v12 || {};
+                const componentYield = cycle.component_yield || {};
+                const syncInfo = cycle.sync_info || {};
+
+                // Sync display with icon and alignment count
+                const isRising = syncInfo.is_rising;
+                const numAligned = syncInfo.num_aligned || 0;
+                const alignmentConf = syncInfo.alignment_confidence;
+
+                const syncIcon = isRising ? '🟢' : '🔴';
+                const syncText = numAligned > 0 ?
+                    `${numAligned} aligned (${alignmentConf})` :
+                    (isRising ? 'Rising' : 'Falling');
+
+                // Health metrics display
+                const health = cycle.health || {};
+                const healthBadge = health.badge || '⚪';
+                const healthScore = health.score !== undefined ? health.score : '?';
+                const healthStatus = health.status || 'Unknown';
+
+                return `
+                    <div class="cycle-item ${cycle.wavelength === defaultSelectedCycle ? 'selected' : ''}"
+                         onclick="loadBandpassForCycle(${cycle.wavelength})"
+                         data-wavelength="${cycle.wavelength}"
+                         style="padding: 12px; cursor: pointer; border: 1px solid #444; margin-bottom: 10px; border-radius: 4px;">
+                        <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">${cycle.wavelength}d</div>
+                        <div style="font-size: 15px; line-height: 2.0;">
+                            <div><strong>Rating:</strong> ${rating.emoji || ''} ${rating.class || '-'}</div>
+                            <div><strong>Quality:</strong> ${qualityV12.star_display || '-'}</div>
+                            <div><strong>Yield:</strong> ${componentYield.yield_percent !== undefined ? componentYield.yield_percent + '%' : '-'}</div>
+                            <div><strong>Sync:</strong> ${syncIcon} ${syncText}</div>
+                            <div><strong>Health:</strong> ${healthBadge} ${healthScore}/100</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Set initial selected cycle
+            if (!selectedCycle && cycles.length > 0) {
+                selectedCycle = defaultSelectedCycle || cycles[0].wavelength;
+            }
+        }
+
+        // Help section toggle
+        function toggleHelp() {
+            const helpSection = document.getElementById('helpSection');
+            const helpOverlay = document.getElementById('helpOverlay');
+            helpSection.classList.toggle('show');
+            helpOverlay.classList.toggle('show');
+        }
+    </script>
+
+    <!-- Help Button (floating) -->
+    <button class="help-button" onclick="toggleHelp()" title="Show/Hide Rating Guide">?</button>
+
+    <!-- Help Overlay -->
+    <div id="helpOverlay" class="help-overlay" onclick="toggleHelp()"></div>
+
+    <!-- Help Section -->
+    <div id="helpSection" class="help-section">
+        <span class="help-close" onclick="toggleHelp()">&times;</span>
+        <h2>📊 Complete Cycles Detector System Documentation</h2>
+
+        <h3>🔬 How Cycle Detection Works</h3>
+
+        <h4>1. Morlet Wavelet Transform (CWT)</h4>
+        <p><strong>What it does:</strong> Decomposes price data into frequency components to find dominant cycles.</p>
+        <p><strong>Algorithm:</strong></p>
+        <pre style="background: #1a1a1a; padding: 10px; border-radius: 4px; overflow-x: auto;">For each wavelength (100-800 days):
+  1. Create Morlet wavelet with Q=50 (high selectivity)
+  2. Convolve wavelet with price data at multiple time windows
+  3. Calculate RMS power = sqrt(mean(|convolution|²))
+  4. Average power across sliding windows</pre>
+        <p><strong>Key Parameters:</strong></p>
+        <ul>
+            <li><strong>Q = 50:</strong> High sharpness for precise frequency detection</li>
+            <li><strong>Uniform Q:</strong> All wavelengths detected with equal sensitivity (no bias)</li>
+            <li><strong>Sliding Windows:</strong> Multiple windows averaged for stability</li>
+        </ul>
+
+        <h4>2. Power Spectrum & Amplitude</h4>
+        <p><strong>What "Amplitude" means:</strong></p>
+        <p style="background: #2a2a2a; padding: 12px; border-left: 3px solid #ff9900; margin: 10px 0;">
+            The amplitude in the power spectrum is <strong>NOT price amplitude</strong>. It is the <strong>RMS (Root Mean Square) power</strong>
+            of the wavelet transform coefficients - a measure of cycle strength, not price movement size.
+        </p>
+        <ul>
+            <li><strong>High amplitude</strong> = Strong, consistent cycle at that frequency</li>
+            <li><strong>Low amplitude</strong> = Weak or absent cycle</li>
+            <li>Units are normalized (0-1 scale after smoothing)</li>
+            <li>Peak height indicates cycle strength</li>
+        </ul>
+
+        <hr style="border: 1px solid #333; margin: 20px 0;">
+
+        <h3>⚙️ Letter Rating System (A/B/C/D)</h3>
+        <p><strong>What it measures:</strong> Statistical quality of the cycle signal</p>
+
+        <h4>The 5 Metrics:</h4>
+
+        <p><strong>1. Amplitude Stationarity (0-100%)</strong><br>
+        <em>How consistent the wave height is over time</em></p>
+        <pre style="background: #1a1a1a; padding: 8px; border-radius: 4px; font-size: 11px;">amplitudes = [abs(peak - trough) for each cycle]
+CV = std(amplitudes) / mean(amplitudes)
+stationarity = exp(-2 × CV) × 100%</pre>
+        <ul style="font-size: 13px; margin-left: 20px;">
+            <li>100% = Perfectly consistent wave heights</li>
+            <li>80%+ = Highly stationary (A-rating threshold)</li>
+            <li>&lt;60% = Erratic, unreliable</li>
+        </ul>
+
+        <p><strong>2. Frequency Stationarity (0-100%)</strong><br>
+        <em>How consistent the wavelength is over time</em></p>
+        <pre style="background: #1a1a1a; padding: 8px; border-radius: 4px; font-size: 11px;">wavelengths = [distance between zero-crossings]
+CV = std(wavelengths) / mean(wavelengths)
+error = abs(mean_wl - expected_wl) / expected_wl
+stationarity = exp(-2 × CV - error) × 100%</pre>
+        <ul style="font-size: 13px; margin-left: 20px;">
+            <li>100% = Rock-solid period</li>
+            <li>80%+ = Very consistent (A-rating)</li>
+            <li>&lt;60% = Period jumps randomly</li>
+        </ul>
+
+        <p><strong>3. Spectral Isolation (0-100%)</strong><br>
+        <em>How well-separated this cycle is from other cycles</em></p>
+        <pre style="background: #1a1a1a; padding: 8px; border-radius: 4px; font-size: 11px;">wl_separation = abs(wl - nearest_wl) / wl
+power_ratio = peak_power / nearest_peak_power
+isolation = (wl_separation × 0.5 + tanh(power_ratio-1) × 0.5) × 100%</pre>
+        <ul style="font-size: 13px; margin-left: 20px;">
+            <li>100% = No nearby competing cycles</li>
+            <li>70%+ = Well-isolated (A-rating)</li>
+            <li>&lt;50% = Crowded, overlapping</li>
+        </ul>
+
+        <p><strong>4. Signal-to-Noise Ratio (SNR)</strong><br>
+        <em>How much stronger the cycle is vs background noise</em></p>
+        <pre style="background: #1a1a1a; padding: 8px; border-radius: 4px; font-size: 11px;">signal = spectrum[peak_wavelength]
+noise = mean(spectrum[far_from_peak])
+SNR = signal / noise</pre>
+        <ul style="font-size: 13px; margin-left: 20px;">
+            <li>&gt;5.0 = Excellent clarity (A-rating)</li>
+            <li>&gt;3.0 = Good clarity (B-rating)</li>
+            <li>&lt;2.0 = Mostly noise</li>
+        </ul>
+
+        <p><strong>5. Gain Rank</strong><br>
+        <em>Where this cycle ranks in power/strength</em></p>
+        <ul style="font-size: 13px; margin-left: 20px;">
+            <li>Rank 1 = Dominant cycle (required for A-rating)</li>
+            <li>Rank 1-2 = Strong cycles (B-rating)</li>
+            <li>Rank 3+ = Secondary cycles</li>
+        </ul>
+
+        <h4>Rating Classification:</h4>
+        <table style="font-size: 12px;">
+            <tr>
+                <th>Rating</th>
+                <th>Criteria</th>
+                <th>Use</th>
+            </tr>
+            <tr>
+                <td>🔥 <strong>A</strong></td>
+                <td>Amp/Freq &gt; 80%, Rank 1, Isolation &gt; 70%, SNR &gt; 5.0</td>
+                <td><strong>HIGHEST</strong> - Primary signals</td>
+            </tr>
+            <tr>
+                <td>👌 <strong>B</strong></td>
+                <td>Amp/Freq &gt; 70%, Rank ≤ 2, Isolation &gt; 60%, SNR &gt; 3.0</td>
+                <td><strong>HIGH</strong> - Reliable trading</td>
+            </tr>
+            <tr>
+                <td>👍 <strong>C</strong></td>
+                <td>Amp/Freq &gt; 60%, Rank ≤ 2, SNR &gt; 2.0</td>
+                <td><strong>MODERATE</strong> - Confirmation</td>
+            </tr>
+            <tr>
+                <td>⚠️ <strong>D</strong></td>
+                <td>Below C thresholds</td>
+                <td><strong>LOW</strong> - Avoid trading</td>
+            </tr>
+        </table>
+
+        <hr style="border: 1px solid #333; margin: 20px 0;">
+
+        <h3>💰 Component Yield Calculation</h3>
+        <p><strong>What it is:</strong> Theoretical trading performance if you perfectly traded the cycle's peaks and troughs.</p>
+
+        <p style="background: #2a2a2a; padding: 12px; border-left: 3px solid #ff9900; margin: 10px 0;">
+            <strong>Note:</strong> This is a theoretical trading simulation for comparing cycle quality.
+        </p>
+
+        <p><strong>Algorithm:</strong></p>
+        <pre style="background: #1a1a1a; padding: 10px; border-radius: 4px; font-size: 11px; overflow-x: auto;">1. Find peaks (sell signals) and troughs (buy signals) in bandpass
+2. Create chronological event list
+3. Execute trades (long-only):
+   - Buy at each trough
+   - Sell at next peak
+   - Calculate return = (sell - buy) / buy × 100%
+4. Sum all trade returns = cumulative yield</pre>
+
+        <p><strong>Example:</strong></p>
+        <pre style="background: #1a1a1a; padding: 10px; border-radius: 4px; font-size: 11px;">Buy at trough:  $100 → Sell at peak: $110 → 10% return
+Buy at trough:  $108 → Sell at peak: $130 → 20.4% return
+Cumulative Yield: 10% + 20.4% = 30.4%</pre>
+
+        <p><strong>Interpretation:</strong></p>
+        <ul style="font-size: 13px;">
+            <li>&gt;100% = Excellent performance (A/B yield rating)</li>
+            <li>50-100% = Good performance (C yield rating)</li>
+            <li>&lt;50% = Weak performance (D yield rating)</li>
+        </ul>
+
+        <p style="background: #442222; padding: 10px; border-radius: 4px; font-size: 12px;">
+            ⚠️ <strong>This is theoretical "perfect" trading</strong> (hindsight)<br>
+            ⚠️ Does NOT account for: slippage, commissions, realistic entry/exit timing<br>
+            ⚠️ Purpose: Compare cycle quality, not predict actual returns
+        </p>
+
+        <hr style="border: 1px solid #333; margin: 20px 0;">
+
+        <h3>⭐ Star Rating System (V12 - Harmonic Validation)</h3>
+        <p><strong>What it measures:</strong> Physical validity based on Hurst's harmonic theory</p>
+
+        <h4>Harmonic Theory (J.M. Hurst):</h4>
+        <p>Real market cycles are harmonically related by simple ratios: 2:1, 3:1, 4:1</p>
+        <pre style="background: #1a1a1a; padding: 10px; border-radius: 4px; font-size: 11px;">Example Family:
+720d (base)
+ ├─ 360d (half - 2:1 ratio)
+ ├─ 240d (third - 3:1 ratio)
+ └─ 180d (quarter - 4:1 ratio)
+     └─ 90d (half of 180d)</pre>
+
+        <h4>Quality Score (0-100):</h4>
+        <p><strong>50 points from SNR:</strong></p>
+        <ul style="font-size: 13px; margin-left: 20px;">
+            <li>SNR ≥ 5.0 → 50 points</li>
+            <li>SNR ≥ 3.0 → 40 points</li>
+            <li>SNR ≥ 2.0 → 25 points</li>
+            <li>SNR &lt; 2.0 → 10 points</li>
+        </ul>
+
+        <p><strong>50 points from Harmonic Family:</strong></p>
+        <ul style="font-size: 13px; margin-left: 20px;">
+            <li>3+ partners → 50 points (large family)</li>
+            <li>2 partners → 40 points (medium family)</li>
+            <li>1 partner → 25 points (small family)</li>
+            <li>0 partners → 0 points (orphan)</li>
+        </ul>
+
+        <table style="font-size: 12px; margin-top: 10px;">
+            <tr>
+                <th>Stars</th>
+                <th>Score</th>
+                <th>Label</th>
+            </tr>
+            <tr>
+                <td><strong>⭐⭐⭐⭐</strong></td>
+                <td>80-100</td>
+                <td><strong>Excellent</strong> - Large family, high SNR</td>
+            </tr>
+            <tr>
+                <td><strong>⭐⭐⭐</strong></td>
+                <td>60-79</td>
+                <td><strong>Good</strong> - Part of family, good SNR</td>
+            </tr>
+            <tr>
+                <td><strong>⭐⭐</strong></td>
+                <td>40-59</td>
+                <td><strong>Fair</strong> - Small family or marginal SNR</td>
+            </tr>
+            <tr>
+                <td style="color: #FF6B6B;"><strong>⭐</strong></td>
+                <td>0-39</td>
+                <td><strong>Poor</strong> - Orphan or low SNR</td>
+            </tr>
+        </table>
+
+        <h4>Orphan Cycles:</h4>
+        <p style="background: #442222; padding: 10px; border-radius: 4px; font-size: 13px;">
+            <strong>Definition:</strong> Cycles with no harmonic partners<br>
+            <strong>Why they matter:</strong> Likely noise or measurement artifacts, not real market rhythms<br>
+            <strong>Display:</strong> Shown in red to warn users
+        </p>
+
+        <hr style="border: 1px solid #333; margin: 20px 0;">
+
+        <h3>💊 Health Metrics (V12 - Cycle Degradation Detection)</h3>
+        <p><strong>What it measures:</strong> Whether a cycle is weakening or changing period over time</p>
+
+        <h4>Two Key Indicators:</h4>
+
+        <p><strong>1. Amplitude Consistency</strong><br>
+        <em>Is the cycle losing power?</em></p>
+        <pre style="background: #1a1a1a; padding: 10px; border-radius: 4px; font-size: 11px;">Compare recent 3 cycles vs historical average:
+amp_change_pct = (recent_avg - historical_avg) / historical_avg × 100%</pre>
+        <ul style="font-size: 13px; margin-left: 20px;">
+            <li><strong>Stable</strong>: Amplitude consistent or growing</li>
+            <li><strong>⚠️ Warning</strong>: Amplitude down 25%+ (cycle weakening)</li>
+            <li><strong>🔴 Critical</strong>: Amplitude down 50%+ (cycle dying)</li>
+        </ul>
+
+        <p><strong>2. Wavelength Stability</strong><br>
+        <em>Is the cycle speeding up or slowing down?</em></p>
+        <pre style="background: #1a1a1a; padding: 10px; border-radius: 4px; font-size: 11px;">Measure actual period via peak-to-peak distance:
+drift_pct = (measured_period - expected_period) / expected_period × 100%</pre>
+        <ul style="font-size: 13px; margin-left: 20px;">
+            <li><strong>Stable</strong>: Period within ±5% of expected</li>
+            <li><strong>⚠️ Warning</strong>: Period drifted 10%+ (need recalibration)</li>
+            <li><strong>🔴 Critical</strong>: Period drifted 20%+ (cycle transforming)</li>
+        </ul>
+
+        <h4>Health Score (0-100):</h4>
+        <table style="font-size: 12px; margin-top: 10px;">
+            <tr>
+                <th>Badge</th>
+                <th>Score</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+            <tr>
+                <td><strong>🟢</strong></td>
+                <td>80-100</td>
+                <td><strong>Healthy</strong></td>
+                <td>✅ Safe to trade - cycle stable</td>
+            </tr>
+            <tr>
+                <td><strong>🟡</strong></td>
+                <td>60-79</td>
+                <td><strong>Degrading</strong></td>
+                <td>⚠️ Monitor closely - showing weakness</td>
+            </tr>
+            <tr>
+                <td style="color: #ff4444;"><strong>🔴</strong></td>
+                <td>0-59</td>
+                <td><strong>Unstable</strong></td>
+                <td>❌ Avoid - cycle breaking down</td>
+            </tr>
+        </table>
+
+        <p style="background: #2a2a2a; padding: 12px; border-left: 3px solid #ffaa00; margin: 10px 0; font-size: 13px;">
+            <strong>Trading Tip:</strong> Even an A-rated cycle with 4 stars should be avoided if Health shows 🔴 Unstable.
+            Health metrics detect when previously-strong cycles are losing reliability.
+        </p>
+
+        <hr style="border: 1px solid #333; margin: 20px 0;">
+
+        <h3>🎯 Combined Trading Strategy</h3>
+
+        <table style="font-size: 12px;">
+            <tr>
+                <th>Letter</th>
+                <th>Stars</th>
+                <th>Confidence</th>
+                <th>Trading Action</th>
+            </tr>
+            <tr>
+                <td><strong>A</strong></td>
+                <td><strong>⭐⭐⭐⭐</strong></td>
+                <td style="color: #44ff44;"><strong>HIGHEST</strong></td>
+                <td>🏆 Gold standard - best possible signal</td>
+            </tr>
+            <tr>
+                <td><strong>A/B</strong></td>
+                <td><strong>⭐⭐⭐⭐ or ⭐⭐⭐</strong></td>
+                <td style="color: #88ff88;"><strong>HIGH</strong></td>
+                <td>✅ Use for PRIMARY trading signals</td>
+            </tr>
+            <tr>
+                <td><strong>B/C</strong></td>
+                <td><strong>⭐⭐⭐</strong></td>
+                <td style="color: #ffff44;"><strong>MODERATE</strong></td>
+                <td>⚡ Use for SECONDARY signals or confirmation</td>
+            </tr>
+            <tr>
+                <td><strong>D</strong></td>
+                <td>Any</td>
+                <td style="color: #ff4444;"><strong>LOW</strong></td>
+                <td>❌ Don't trade - too unreliable</td>
+            </tr>
+            <tr>
+                <td>Any</td>
+                <td style="color: #FF6B6B;"><strong>⭐</strong></td>
+                <td style="color: #ff4444;"><strong>LOW</strong></td>
+                <td>❌ Don't trade - orphan/noise</td>
+            </tr>
+        </table>
+
+        <hr style="border: 1px solid #333; margin: 20px 0;">
+
+        <h3>📈 Complete Workflow</h3>
+        <pre style="background: #1a1a1a; padding: 12px; border-radius: 4px; font-size: 12px; line-height: 1.6;">1. DETECTION (Morlet CWT)
+   ↓
+   Power Spectrum → Find peaks (dominant cycles)
+
+2. EXTRACTION (Bandpass Filter)
+   ↓
+   Isolate each cycle → Create pure sine-like wave
+
+3. QUALITY ANALYSIS
+   ↓
+   Calculate 5 metrics → Assign A/B/C/D rating
+
+4. YIELD SIMULATION
+   ↓
+   Trade peaks/troughs → Calculate theoretical return
+
+5. HARMONIC VALIDATION (V12)
+   ↓
+   Find families → Assign ⭐ rating
+
+6. TRADING DECISION
+   ↓
+   Combine letter + stars → Choose best signals</pre>
+
+        <hr style="border: 1px solid #333; margin: 20px 0;">
+
+        <h3>💡 Pro Tips</h3>
+        <ul style="line-height: 1.8; font-size: 13px;">
+            <li><strong>Always check BOTH ratings</strong> - Don't trade on letter rating alone</li>
+            <li><strong>Prioritize harmonic families</strong> - 4-star cycles more reliable than orphans</li>
+            <li><strong>A + ⭐⭐⭐⭐ = Gold standard</strong> - Best possible signal</li>
+            <li><strong>Orphans are suspect</strong> - Even A-rated orphans may be noise</li>
+            <li><strong>Yield is theoretical</strong> - Real trading will differ</li>
+        </ul>
+
+        <p style="margin-top: 20px; padding: 15px; background: #224422; border-left: 4px solid #44ff44; font-size: 13px;">
+            <strong>🏆 Best Practice:</strong> Focus on cycles with <strong>high letter ratings (A/B)</strong> AND
+            <strong>high star ratings (⭐⭐⭐⭐/⭐⭐⭐)</strong>. These represent cycles that are both statistically
+            clean AND physically valid according to harmonic theory.
+        </p>
+    </div>
+</body>
+</html>

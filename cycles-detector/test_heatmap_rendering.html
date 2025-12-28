@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { background: #0a0a0a; color: white; font-family: Arial; padding: 20px; }
+    </style>
+</head>
+<body>
+    <h2>Test: Horizontal Band at Wavelength 335</h2>
+    <div id="heatmap" style="width:1400px;height:600px;"></div>
+
+    <script>
+        // Simulate backend data: 10 weeks × 20 wavelengths
+        // Wavelengths: 100, 150, 200, 250, 300, 335, 350, ..., 500
+        const wavelengths = [];
+        for (let w = 100; w <= 500; w += 20) {
+            wavelengths.push(w);
+        }
+        // Add 335 specifically
+        wavelengths.splice(12, 0, 335);
+        wavelengths.sort((a,b) => a-b);
+
+        console.log('Wavelengths:', wavelengths);
+        const idx335 = wavelengths.indexOf(335);
+        console.log('Index of 335:', idx335);
+
+        // Create backend data: [week][wavelength]
+        const backendData = [];
+        for (let week = 0; week < 10; week++) {
+            const weekData = [];
+            for (let wl = 0; wl < wavelengths.length; wl++) {
+                if (wl === idx335) {
+                    // High power at wavelength 335 for ALL weeks
+                    weekData.push(0.95);
+                } else {
+                    // Low power everywhere else
+                    weekData.push(0.1);
+                }
+            }
+            backendData.push(weekData);
+        }
+
+        console.log('Backend data[0]['+idx335+'] (Week 0, WL 335):', backendData[0][idx335]);
+        console.log('Backend data[9]['+idx335+'] (Week 9, WL 335):', backendData[9][idx335]);
+
+        // Frontend transpose: [wavelength][week]
+        const heatmapFlipped = wavelengths.map((_, wlIndex) =>
+            backendData.map(weekData => weekData[wlIndex])
+        );
+
+        console.log('Transposed['+idx335+'] (WL 335 across all weeks):', heatmapFlipped[idx335]);
+
+        // Create Plotly heatmap
+        const trace = {
+            z: heatmapFlipped,
+            y: wavelengths,  // CRITICAL: Map rows to wavelength values
+            type: 'heatmap',
+            colorscale: [
+                [0, '#000000'],
+                [0.2, '#1a0033'],
+                [0.4, '#330066'],
+                [0.6, '#6600cc'],
+                [0.8, '#9933ff'],
+                [1, '#ffffff']
+            ],
+            zmin: 0,
+            zmax: 1.0
+        };
+
+        const layout = {
+            title: 'Expected: ONE horizontal bright band at Y=335',
+            paper_bgcolor: '#0a0a0a',
+            plot_bgcolor: '#0a0a0a',
+            font: { color: 'white' },
+            xaxis: { title: 'Week', color: 'white' },
+            yaxis: { title: 'Wavelength (Trading Days)', color: 'white' },
+            annotations: [{
+                x: 5,
+                y: 335,
+                text: '◄ 335',
+                showarrow: false,
+                font: { color: 'yellow', size: 16 },
+                xanchor: 'left',
+                yanchor: 'middle'
+            }]
+        };
+
+        Plotly.newPlot('heatmap', [trace], layout);
+    </script>
+</body>
+</html>

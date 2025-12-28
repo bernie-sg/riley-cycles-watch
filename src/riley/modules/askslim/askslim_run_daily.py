@@ -10,6 +10,7 @@ from pathlib import Path
 # Import our modules
 from src.riley.modules.askslim.askslim_smoketest import verify_session
 from src.riley.modules.askslim.askslim_scraper import run_scraper
+from src.riley.cycles_rebuild import CyclesRebuilder
 
 
 def run_daily_scrape():
@@ -18,6 +19,7 @@ def run_daily_scrape():
 
     1. Verify session is still valid
     2. Run the askSlim scraper to get cycle data
+    3. Rebuild cycle projections for updated specs
     """
     print("="*60)
     print("askSlim Daily Run - Complete Scrape")
@@ -54,6 +56,29 @@ def run_daily_scrape():
         print("\n✓ Scraping completed successfully")
     except Exception as e:
         print(f"\n✗ Scraping failed: {e}")
+        return False
+
+    # Rebuild cycle projections
+    print("\n3. Rebuilding cycle projections...")
+    print("   This will deactivate old projections and create new ones")
+    print("   based on the updated cycle specs from askSlim")
+    print("")
+
+    try:
+        rebuilder = CyclesRebuilder()
+        results = rebuilder.rebuild_all()
+
+        print(f"\n   Rebuilt: {results['rebuilt']}")
+        print(f"   Skipped: {results['skipped']}")
+        print(f"   Errors: {results['errors']}")
+
+        if results['errors'] > 0:
+            print("\n⚠️  Some projections failed to rebuild (see details above)")
+        else:
+            print("\n✓ All projections rebuilt successfully")
+
+    except Exception as e:
+        print(f"\n✗ Projection rebuild failed: {e}")
         return False
 
     print("\n" + "="*60)

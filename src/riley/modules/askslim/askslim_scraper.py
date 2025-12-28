@@ -197,55 +197,34 @@ def update_riley_database(riley_symbol, timeframe, cycle_date, cycle_length, sup
 
         instrument_id = instrument[0]
 
-        # Check if cycle spec exists (active records only)
+        # NO VERSIONING: Delete old record and insert new one with version=1
+        # askSlim always has the latest data - we don't keep history
+
+        # Delete any existing cycle spec for this instrument/timeframe
         cursor.execute("""
-            SELECT cycle_id, version FROM cycle_specs
-            WHERE instrument_id = ? AND timeframe = ? AND status = 'ACTIVE'
-            ORDER BY version DESC LIMIT 1
+            DELETE FROM cycle_specs
+            WHERE instrument_id = ? AND timeframe = ? AND source = 'askSlim'
         """, (instrument_id, tf_full))
 
-        existing = cursor.fetchone()
+        deleted_count = cursor.rowcount
 
-        if existing:
-            # Mark old record as superseded
-            old_cycle_id, old_version = existing
-            new_version = old_version + 1
+        # Insert new record (always version=1)
+        cursor.execute("""
+            INSERT INTO cycle_specs (
+                instrument_id, timeframe, anchor_input_date_label,
+                cycle_length_bars, source, version, status,
+                window_minus_bars, window_plus_bars, prewindow_lead_bars,
+                support_level, resistance_level,
+                created_at, updated_at, median_input_date_label
+            ) VALUES (?, ?, ?, ?, ?, 1, 'ACTIVE', 3, 3, 2, ?, ?,
+                datetime('now'), datetime('now'), ?)
+        """, (instrument_id, tf_full, cycle_date, cycle_length, "askSlim",
+              support_level, resistance_level, cycle_date))
 
-            cursor.execute("""
-                UPDATE cycle_specs
-                SET status = 'SUPERSEDED', updated_at = datetime('now')
-                WHERE cycle_id = ?
-            """, (old_cycle_id,))
-
-            # Insert new record with incremented version
-            cursor.execute("""
-                INSERT INTO cycle_specs (
-                    instrument_id, timeframe, anchor_input_date_label,
-                    cycle_length_bars, source, version, status,
-                    window_minus_bars, window_plus_bars, prewindow_lead_bars,
-                    support_level, resistance_level,
-                    created_at, updated_at, median_input_date_label
-                ) VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', 3, 3, 2, ?, ?,
-                    datetime('now'), datetime('now'), ?)
-            """, (instrument_id, tf_full, cycle_date, cycle_length, "askSlim", new_version,
-                  support_level, resistance_level, cycle_date))
-
-            print(f"  ✓ Updated {riley_symbol} {tf_full}: v{old_version} → v{new_version}")
+        if deleted_count > 0:
+            print(f"  ✓ Updated {riley_symbol} {tf_full} (replaced old record)")
         else:
-            # Insert new record
-            cursor.execute("""
-                INSERT INTO cycle_specs (
-                    instrument_id, timeframe, anchor_input_date_label,
-                    cycle_length_bars, source, version, status,
-                    window_minus_bars, window_plus_bars, prewindow_lead_bars,
-                    support_level, resistance_level,
-                    created_at, updated_at, median_input_date_label
-                ) VALUES (?, ?, ?, ?, ?, 1, 'ACTIVE', 3, 3, 2, ?, ?,
-                    datetime('now'), datetime('now'), ?)
-            """, (instrument_id, tf_full, cycle_date, cycle_length, "askSlim",
-                  support_level, resistance_level, cycle_date))
-
-            print(f"  ✓ Inserted {riley_symbol} {tf_full}: new record")
+            print(f"  ✓ Inserted {riley_symbol} {tf_full} (new record)")
 
         conn.commit()
         return True

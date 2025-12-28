@@ -1,0 +1,1646 @@
+#!/usr/bin/env python3
+"""
+Cycles Detector Web Application
+================================
+Flask backend providing cycle analysis through web interface
+"""
+
+from flask import Flask, render_template, request, jsonify
+import numpy as np
+import pandas as pd
+import sys
+import os
+from datetime import datetime, timedelta
+import json
+import base64
+import io
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib.pyplot as plt
+from scipy.signal import find_peaks
+
+# V12: Import quality analyzer and synchronization analyzer
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'algorithms'))
+from cycle_quality import CycleQualityAnalyzer
+from cycle_synchronization import CycleSynchronizationAnalyzer
+from goertzel import GoertzelAnalyzer
+
+# Add algorithms to path
+sys.path.append('algorithms/heatmap')
+sys.path.append('algorithms/bandpass')
+sys.path.append('algorithms')
+
+
+def convert_numpy_types(obj):
+    """Recursively convert numpy types to Python native types for JSON serialization."""
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, (np.integer, np.int64, np.int32)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64, np.float32)):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_numpy_types(item) for item in obj]
+    else:
+        return obj
+
+
+from heatmap_algo import process_week_on_grid
+from bandpass_filter import create_bandpass_filter, find_peaks_and_troughs
+from wavelet_bandpass import create_wavelet_bandpass_filter
+from algorithms.bandpass.pure_sine_bandpass import create_pure_sine_bandpass
+from data_manager import DataManager
+from cycle_rating import rate_cycle
+from bartels_test import calculate_bartels_score, filter_cycles_by_bartels
+from component_yield import calculate_component_yield, get_yield_rating
+from mesa_detector import mesa_cycle_detector, calculate_mesa_significance
+from cycle_health import calculate_cycle_health
+
+app = Flask(__name__)
+
+# Progress tracking system for analysis
+analysis_progress = {}
+
+def update_progress(symbol, message):
+    """Update progress message for a given symbol"""
+    analysis_progress[symbol.upper()] = {
+        'message': message,
+        'timestamp': datetime.now().isoformat()
+    }
+    print(f"PROGRESS [{symbol}]: {message}")  # Also log to console
+
+def get_progress(symbol):
+    """Get current progress for a symbol"""
+    return analysis_progress.get(symbol.upper(), {
+        'message': 'Starting analysis...',
+        'timestamp': datetime.now().isoformat()
+    })
+
+def clear_progress(symbol):
+    """Clear progress for a symbol"""
+    if symbol.upper() in analysis_progress:
+        del analysis_progress[symbol.upper()]
+
+class CyclesAnalyzer:
+    def __init__(self, symbol='TLT'):
+        self.symbol = symbol.upper()
+        self.prices = None
+        self.price_df = None
+        self.load_data()
+
+    def load_data(self):
+        """Load price data using DataManager"""
+        try:
+            update_progress(self.symbol, f"Downloading data from Yahoo Finance for {self.symbol}...")
+            dm = DataManager(self.symbol)
+            self.prices, self.price_df = dm.get_data()
+            update_progress(self.symbol, f"Downloaded {len(self.prices)} bars of data for {self.symbol}")
+        except Exception as e:
+            error_msg = f"Error loading data for {self.symbol}: {str(e)}"
+            print(error_msg)
+            self.prices = np.array([])
+            self.price_df = None
+            self.error_message = error_msg
+            update_progress(self.symbol, error_msg)
+
+    def analyze(self, window_size=None, min_wavelength=100, max_wavelength=800, wavelength_step=1,
+                phase_method="hilbert", phase_window_size=1000, suppress_long_cycles=True, heatmap_years=10,
+                align_to='trough', scan_algorithm="morlet", price_chart_years=10,
+                bandpass_phase_method="actual_price_peaks"):
+        """
+        Perform complete cycle analysis
+
+        Args:
+            window_size: Analysis window (None = use all data)
+            phase_method: "hilbert" (auto, best) or "correlation" (manual)
+            phase_window_size: Number of bars for phase calculation
+            suppress_long_cycles: Apply high-pass filter to suppress cycles >600d
+            align_to: Bandpass phase alignment - 'trough' (default, more predictable), 'peak', or 'auto'
+        """
+        update_progress(self.symbol, f"Initializing cycle analysis using {scan_algorithm.upper()} algorithm...")
+
+        if len(self.prices) == 0:
+            error_msg = getattr(self, 'error_message', "No price data available. Please check the ticker symbol.")
+            return {"error": error_msg}
+
+        # Cap window_size to allow heatmap_years of historical data for heatmap
+        # Calculate minimum bars needed for heatmap (weeks * 5 days/week)
+        heatmap_weeks = int(heatmap_years * 52)  # weeks per year
+        heatmap_bars = heatmap_weeks * 5  # 5 trading days per week
+
+        # Total needed: window_size + heatmap_bars
+        max_allowed_window = len(self.prices) - heatmap_bars
+
+        if window_size is None:
+            # Default to 4000, but cap to available data
+            window_size = min(4000, max_allowed_window)
+        else:
+            # User-specified, but still cap to available data
+            window_size = min(window_size, max_allowed_window)
+
+        # Ensure minimum window size for meaningful analysis
+        # Allow smaller windows (200 bars minimum) for short-term cycle detection
+        min_window = 200
+        min_required_bars = min_window + heatmap_bars
+        if window_size < min_window:
+            return {"error": f"Insufficient data for {self.symbol}. Need at least {min_required_bars} bars, have {len(self.prices)}"}
+
+        # Setup wavelengths - Yahoo Finance data is ALREADY in trading days
+        # Users specify wavelengths in trading days (e.g., 420d = 420 trading days)
+        wavelengths = np.arange(min_wavelength, max_wavelength + 1, wavelength_step)
+
+        # Choose detection algorithm
+        if scan_algorithm == "mesa":
+            # MESA CYCLE DETECTION
+            # Use MESA to detect cycles - completely separate from Morlet
+
+            # Wavelengths are ALREADY in trading days - no conversion needed
+            min_wavelength_trading = int(min_wavelength)
+            max_wavelength_trading = int(max_wavelength)
+
+            # Run MESA detector on most recent data
+            update_progress(self.symbol, f"Running MESA cycle detection ({min_wavelength}-{max_wavelength}d range)...")
+            mesa_result = mesa_cycle_detector(
+                self.prices[-window_size:],
+                min_wavelength=min_wavelength_trading,
+                max_wavelength=max_wavelength_trading,
+                window_size=None,  # Use all provided data
+                num_peaks=20
+            )
+
+            # Create power spectrum array matching wavelengths
+            power_spectrum_raw = np.zeros(len(wavelengths))
+
+            if len(mesa_result['peaks']) > 0:
+                # Map MESA peaks to our wavelength grid
+                detected_wavelengths = mesa_result['wavelengths'][mesa_result['peaks']]
+                detected_powers = mesa_result['spectrum'][mesa_result['peaks']]
+
+                # Wavelengths are already in trading days - use directly
+                # Assign power to nearest wavelength bins
+                for wl, power in zip(detected_wavelengths, detected_powers):
+                    # Find nearest wavelength in our grid
+                    idx = np.argmin(np.abs(wavelengths - wl))
+                    power_spectrum_raw[idx] = max(power_spectrum_raw[idx], power)
+
+            # Generate heatmap using MESA on sliding windows
+            max_weeks = (len(self.prices) - window_size) // 5
+            heatmap_raw = []
+            update_progress(self.symbol, f"Generating cycle evolution heatmap ({max_weeks} time periods)...")
+
+            for week in range(max_weeks):
+                week_start = week * 5
+                week_end = week_start + window_size
+                week_prices = self.prices[week_start:week_end]
+
+                mesa_week = mesa_cycle_detector(
+                    week_prices,
+                    min_wavelength=min_wavelength_trading,
+                    max_wavelength=max_wavelength_trading,
+                    window_size=None,
+                    num_peaks=20
+                )
+
+                week_spectrum = np.zeros(len(wavelengths))
+                if len(mesa_week['peaks']) > 0:
+                    week_wavelengths = mesa_week['wavelengths'][mesa_week['peaks']]
+                    week_powers = mesa_week['spectrum'][mesa_week['peaks']]
+
+                    for wl, power in zip(week_wavelengths, week_powers):
+                        idx = np.argmin(np.abs(wavelengths - wl))
+                        week_spectrum[idx] = max(week_spectrum[idx], power)
+
+                heatmap_raw.append(week_spectrum)
+
+            # Global normalization
+            heatmap_raw = np.array(heatmap_raw)
+            global_max = np.max(heatmap_raw)
+            if global_max > 0:
+                heatmap_data = (heatmap_raw / global_max).tolist()
+                power_spectrum = power_spectrum_raw / global_max
+            else:
+                heatmap_data = heatmap_raw.tolist()
+                power_spectrum = power_spectrum_raw
+
+            # MESA: Find all significant peaks for peak_cycles list
+            # Use same peak detection logic as Morlet
+            sorted_peaks = []
+            for i, wavelength in enumerate(wavelengths):
+                amplitude = power_spectrum[i]
+                if amplitude > 0:  # Any non-zero power - show ALL cycles
+                    sorted_peaks.append((amplitude, i))
+
+            sorted_peaks.sort(reverse=True)
+            sorted_peaks = [idx for amp, idx in sorted_peaks[:20]]  # Top 20 peaks (increased to show more cycles)
+
+            peak_cycles = []
+            for peak_idx in sorted_peaks[:20]:  # Process top 20 (show more cycles)
+                wavelength = wavelengths[peak_idx]
+                amplitude = power_spectrum[peak_idx]
+
+                # Calculate MESA significance for this cycle
+                mesa_sig = calculate_mesa_significance(
+                    self.prices,
+                    int(wavelength),  # Already in trading days
+                    bandwidth_pct=0.10
+                )
+
+                # Create rating based on MESA significance
+                if mesa_sig >= 80:
+                    rating_class = 'A'
+                    emoji = '🔥'
+                elif mesa_sig >= 65:
+                    rating_class = 'B'
+                    emoji = '👌'
+                elif mesa_sig >= 50:
+                    rating_class = 'C'
+                    emoji = '👍'
+                else:
+                    rating_class = 'D'
+                    emoji = '⚠️'
+
+                cycle_rating = {
+                    'class': rating_class,
+                    'score': round(mesa_sig, 1),
+                    'spectral_power': round(amplitude, 3),
+                    'spectral_isolation': 0.0,  # Not used for MESA
+                    'emoji': emoji
+                }
+
+                # Calculate component yield using bandpass
+                # Wavelength is already in trading days
+                wavelength_trading = int(wavelength)
+                bp_result_temp = create_pure_sine_bandpass(
+                    self.prices,
+                    wavelength_trading,
+                    bandwidth_pct=0.10,
+                    extend_future=0,
+                    method=bandpass_phase_method,
+                    align_to=align_to
+                )
+                temp_bandpass = bp_result_temp['bandpass_normalized'][:len(self.prices)]
+
+                cy_result = calculate_component_yield(
+                    bandpass_signal=temp_bandpass,
+                    prices=self.prices,
+                    wavelength=int(wavelength)
+                )
+                cy_rating = get_yield_rating(cy_result['yield_percent'])
+
+                # Calculate cycle health metrics
+                health_result = calculate_cycle_health(
+                    bandpass=temp_bandpass,
+                    expected_wavelength_trading_days=int(wavelength)
+                )
+
+                # Store phase information for composite generation
+                cycle_phase_degrees = bp_result_temp['phase_degrees']
+                cycle_phase_radians = cycle_phase_degrees * np.pi / 180.0
+
+                peak_cycles.append({
+                    'wavelength': int(wavelength),
+                    'amplitude': float(amplitude),
+                    'period_years': float(wavelength / 365),
+                    'rating': cycle_rating,
+                    'component_yield': {
+                        'yield_percent': cy_result['yield_percent'],
+                        'num_trades': cy_result['num_trades'],
+                        'rating': cy_rating
+                    },
+                    'health': health_result,
+                    'phase_degrees': float(cycle_phase_degrees),
+                    'phase_radians': float(cycle_phase_radians)
+                })
+
+            # SELECT TOP CYCLE for bandpass display
+            if len(sorted_peaks) > 0:
+                selected_idx = sorted_peaks[0]
+                selected_wavelength = wavelengths[selected_idx]
+            else:
+                selected_idx = np.argmax(power_spectrum)
+                selected_wavelength = wavelengths[selected_idx]
+
+            # BANDPASS with PHASE - Generate sine wave using bandpass
+            # Wavelength is already in trading days
+            selected_wavelength_trading = int(selected_wavelength)
+            future_days = int(selected_wavelength_trading * 2)
+            bandwidth = getattr(self, 'bandwidth', 0.10)
+
+            bp_result = create_pure_sine_bandpass(
+                self.prices,
+                selected_wavelength_trading,
+                bandwidth_pct=bandwidth,
+                extend_future=future_days,
+                method=bandpass_phase_method,
+                align_to=align_to
+            )
+
+            bandpass = bp_result['bandpass_normalized']
+            historical_bandpass = bandpass[:len(self.prices)]
+
+            phase_info = {
+                "method": bp_result['method'] + " (MESA-detected)",
+                "phase_degrees": round(bp_result['phase_degrees'], 1),
+                "phase_window_size": len(self.prices),
+                "amplitude": round(bp_result['amplitude'], 6),
+                "alignment_target": "MESA cycle low"
+            }
+
+        elif scan_algorithm == "goertzel":
+            # GOERTZEL ALGORITHM - For noisy/choppy markets
+
+            goertzel = GoertzelAnalyzer(min_wavelength=min_wavelength, max_wavelength=max_wavelength, step=wavelength_step)
+
+            # Run Goertzel on most recent data
+            goertzel_result = goertzel.detect_cycles(
+                self.prices[-window_size:],
+                num_peaks=20,
+                min_amplitude=0.25
+            )
+
+            # Create power spectrum array matching wavelengths
+            power_spectrum_raw = np.zeros(len(wavelengths))
+
+            if len(goertzel_result['cycles']) > 0:
+                # Map Goertzel peaks to our wavelength grid
+                for cycle in goertzel_result['cycles']:
+                    detected_wl = cycle['wavelength']
+                    detected_amp = cycle['amplitude']
+
+                    # Find nearest wavelength in our grid
+                    idx = np.argmin(np.abs(wavelengths - detected_wl))
+                    power_spectrum_raw[idx] = max(power_spectrum_raw[idx], detected_amp)
+
+            # Generate heatmap using Goertzel on sliding windows
+            max_weeks = (len(self.prices) - window_size) // 5
+            heatmap_raw = []
+
+            for week in range(max_weeks):
+                week_start = week * 5
+                week_end = week_start + window_size
+                week_prices = self.prices[week_start:week_end]
+
+                goertzel_week = goertzel.detect_cycles(
+                    week_prices,
+                    num_peaks=20,
+                    min_amplitude=0.25
+                )
+
+                week_spectrum = np.zeros(len(wavelengths))
+                if len(goertzel_week['cycles']) > 0:
+                    for cycle in goertzel_week['cycles']:
+                        wl = cycle['wavelength']
+                        amp = cycle['amplitude']
+                        idx = np.argmin(np.abs(wavelengths - wl))
+                        week_spectrum[idx] = max(week_spectrum[idx], amp)
+
+                heatmap_raw.append(week_spectrum)
+
+            # Global normalization
+            heatmap_raw = np.array(heatmap_raw)
+            global_max = np.max(heatmap_raw)
+            if global_max > 0:
+                heatmap_data = (heatmap_raw / global_max).tolist()
+                power_spectrum = power_spectrum_raw / global_max
+            else:
+                heatmap_data = heatmap_raw.tolist()
+                power_spectrum = power_spectrum_raw
+
+            # Find all significant peaks for peak_cycles list
+            sorted_peaks = []
+            for i, wavelength in enumerate(wavelengths):
+                amplitude = power_spectrum[i]
+                if amplitude > 0:
+                    sorted_peaks.append((amplitude, i))
+
+            sorted_peaks.sort(reverse=True)
+            sorted_peaks = [idx for amp, idx in sorted_peaks[:20]]
+
+            peak_cycles = []
+            for peak_idx in sorted_peaks[:20]:
+                wavelength = wavelengths[peak_idx]
+                amplitude = power_spectrum[peak_idx]
+
+                # Create rating based on Goertzel amplitude
+                if amplitude >= 0.9:
+                    rating_class = 'A'
+                    emoji = '🔥'
+                elif amplitude >= 0.7:
+                    rating_class = 'B'
+                    emoji = '👌'
+                elif amplitude >= 0.5:
+                    rating_class = 'C'
+                    emoji = '👍'
+                else:
+                    rating_class = 'D'
+                    emoji = '⚠️'
+
+                cycle_rating = {
+                    'class': rating_class,
+                    'score': round(amplitude * 100, 1),
+                    'spectral_power': round(amplitude, 3),
+                    'spectral_isolation': 0.0,
+                    'emoji': emoji
+                }
+
+                # Calculate component yield using bandpass
+                wavelength_trading = int(wavelength)
+                bp_result_temp = create_pure_sine_bandpass(
+                    self.prices,
+                    wavelength_trading,
+                    bandwidth_pct=0.10,
+                    extend_future=0,
+                    method=bandpass_phase_method,
+                    align_to=align_to
+                )
+                temp_bandpass = bp_result_temp['bandpass_normalized'][:len(self.prices)]
+
+                cy_result = calculate_component_yield(
+                    bandpass_signal=temp_bandpass,
+                    prices=self.prices,
+                    wavelength=int(wavelength)
+                )
+                cy_rating = get_yield_rating(cy_result['yield_percent'])
+
+                # Calculate cycle health metrics
+                health_result = calculate_cycle_health(
+                    bandpass=temp_bandpass,
+                    expected_wavelength_trading_days=int(wavelength)
+                )
+
+                # Store phase information for composite generation
+                cycle_phase_degrees = bp_result_temp['phase_degrees']
+                cycle_phase_radians = cycle_phase_degrees * np.pi / 180.0
+
+                peak_cycles.append({
+                    'wavelength': int(wavelength),
+                    'amplitude': float(amplitude),
+                    'period_years': float(wavelength / 365),
+                    'rating': cycle_rating,
+                    'component_yield': {
+                        'yield_percent': cy_result['yield_percent'],
+                        'num_trades': cy_result['num_trades'],
+                        'rating': cy_rating
+                    },
+                    'health': health_result,
+                    'phase_degrees': float(cycle_phase_degrees),
+                    'phase_radians': float(cycle_phase_radians)
+                })
+
+            # SELECT TOP CYCLE for bandpass display
+            if len(sorted_peaks) > 0:
+                selected_idx = sorted_peaks[0]
+                selected_wavelength = wavelengths[selected_idx]
+            else:
+                selected_idx = np.argmax(power_spectrum)
+                selected_wavelength = wavelengths[selected_idx]
+
+            # BANDPASS with PHASE
+            selected_wavelength_trading = int(selected_wavelength)
+            future_days = int(selected_wavelength_trading * 2)
+            bandwidth = getattr(self, 'bandwidth', 0.10)
+
+            bp_result = create_pure_sine_bandpass(
+                self.prices,
+                selected_wavelength_trading,
+                bandwidth_pct=bandwidth,
+                extend_future=future_days,
+                method=bandpass_phase_method,
+                align_to=align_to
+            )
+
+            bandpass = bp_result['bandpass_normalized']
+            historical_bandpass = bandpass[:len(self.prices)]
+
+            phase_info = {
+                "method": bp_result['method'] + " (Goertzel-detected)",
+                "phase_degrees": round(bp_result['phase_degrees'], 1),
+                "phase_window_size": len(self.prices),
+                "amplitude": round(bp_result['amplitude'], 6),
+                "alignment_target": "Goertzel cycle"
+            }
+
+        else:
+            # MORLET WAVELET DETECTION (default for "morlet" and "bartels")
+
+            # 1. POWER SPECTRUM (unnormalized for now - will normalize globally with heatmap)
+            power_spectrum_raw = process_week_on_grid(self.prices, 0, wavelengths, window_size=window_size,
+                                                      suppress_long_cycles=suppress_long_cycles,
+                                                      normalize=False)
+
+            # 2. HEATMAP - Use SAME window as power spectrum with GLOBAL normalization
+            max_weeks = (len(self.prices) - window_size) // 5
+            heatmap_raw = []
+
+            # Collect raw (unnormalized) spectra
+            for week in range(max_weeks):
+                spectrum = process_week_on_grid(self.prices, week, wavelengths,
+                                               window_size=window_size,
+                                               suppress_long_cycles=suppress_long_cycles,
+                                               normalize=False)
+                heatmap_raw.append(spectrum)
+
+            # Global normalization: normalize all weeks AND current spectrum against the same maximum
+            heatmap_raw = np.array(heatmap_raw)
+            global_max = np.max(heatmap_raw)
+            if global_max > 0:
+                heatmap_data = (heatmap_raw / global_max).tolist()
+                power_spectrum = power_spectrum_raw / global_max
+            else:
+                heatmap_data = heatmap_raw.tolist()
+                power_spectrum = power_spectrum_raw
+
+        # Apply Bartels filtering if selected
+        if scan_algorithm == "bartels":
+            # Generate bandpass signals for all wavelengths to test with Bartels
+            # Wavelengths are already in trading days
+            wavelengths_trading = wavelengths
+
+            bandpass_signals = {}
+            for wavelength in wavelengths:
+                # Create bandpass signal using wavelength in trading days
+                wavelength_int = int(wavelength)
+                bp_result = create_pure_sine_bandpass(
+                    self.prices,
+                    wavelength_int,
+                    bandwidth_pct=0.10,
+                    extend_future=0,
+                    method=bandpass_phase_method,
+                    align_to=align_to
+                )
+                # Store with trading day key for Bartels lookup
+                bandpass_signals[wavelength] = bp_result['bandpass_normalized'][:len(self.prices)]
+
+            # Filter cycles using Bartels significance test
+            bartels_result = filter_cycles_by_bartels(
+                spectrum=power_spectrum,
+                wavelengths=wavelengths_trading,
+                bandpass_signals=bandpass_signals,
+                threshold=49.0
+            )
+
+            # Replace power spectrum with Bartels-filtered version
+            power_spectrum = bartels_result['filtered_spectrum']
+
+        # Find peaks - lowered thresholds to show more testable cycles
+        # Use prominence to ensure peaks stand out from surroundings
+        # prominence=0.10 means peak must be 10% higher than surrounding valleys
+        peaks, properties = find_peaks(power_spectrum, height=0.10, prominence=0.10, distance=15)
+        sorted_peaks = peaks[np.argsort(power_spectrum[peaks])[::-1]]
+
+        peak_cycles = []
+        for peak_idx in sorted_peaks[:8]:  # Top 8 significant peaks max (matches frontend display)
+            wavelength = wavelengths[peak_idx]
+            amplitude = power_spectrum[peak_idx]
+            # Only include if amplitude is meaningful (>0.10 - lowered to show more cycles)
+            if amplitude >= 0.10:
+                # Simple rating based on spectral power and isolation
+                # Power is already normalized (0-1), use it directly
+                spectral_power = amplitude
+
+                # Calculate isolation from neighboring peaks (use same strict threshold)
+                all_peaks, _ = find_peaks(power_spectrum, height=0.20, prominence=0.20)
+                other_peaks = all_peaks[all_peaks != peak_idx]
+
+                if len(other_peaks) > 0:
+                    distances = np.abs(other_peaks - peak_idx)
+                    min_distance = np.min(distances)
+                    # Isolation score based on distance (in wavelength units)
+                    isolation = min(1.0, min_distance / 20.0)  # 20 steps = full isolation
+                else:
+                    isolation = 1.0
+
+                # Combined score: 80% power, 20% isolation (power dominates)
+                score = (spectral_power * 0.8 + isolation * 0.2) * 100
+
+                # Much stricter classification - A should be rare
+                if score >= 85 and spectral_power >= 0.9:
+                    rating_class = 'A'
+                    emoji = '🔥'
+                elif score >= 70 and spectral_power >= 0.7:
+                    rating_class = 'B'
+                    emoji = '👌'
+                elif score >= 55 and spectral_power >= 0.5:
+                    rating_class = 'C'
+                    emoji = '👍'
+                else:
+                    rating_class = 'D'
+                    emoji = '⚠️'
+
+                cycle_rating = {
+                    'class': rating_class,
+                    'score': round(score, 1),
+                    'spectral_power': round(spectral_power, 3),
+                    'spectral_isolation': round(isolation, 3),
+                    'emoji': emoji
+                }
+
+                # Calculate component yield for this cycle
+                # Wavelength is already in trading days
+                wavelength_trading = int(wavelength)
+                bp_result_temp = create_pure_sine_bandpass(
+                    self.prices,
+                    wavelength_trading,
+                    bandwidth_pct=0.10,
+                    extend_future=0,  # No future projection needed for yield calculation
+                    method=bandpass_phase_method,
+                    align_to=align_to
+                )
+                temp_bandpass = bp_result_temp['bandpass_normalized'][:len(self.prices)]
+
+                cy_result = calculate_component_yield(
+                    bandpass_signal=temp_bandpass,
+                    prices=self.prices,
+                    wavelength=int(wavelength)
+                )
+                cy_rating = get_yield_rating(cy_result['yield_percent'])
+
+                # Calculate cycle health metrics
+                health_result = calculate_cycle_health(
+                    bandpass=temp_bandpass,
+                    expected_wavelength_trading_days=int(wavelength)
+                )
+
+                # Store phase information for composite generation
+                cycle_phase_degrees = bp_result_temp['phase_degrees']
+                cycle_phase_radians = cycle_phase_degrees * np.pi / 180.0
+
+                peak_cycles.append({
+                    'wavelength': int(wavelength),
+                    'amplitude': float(amplitude),
+                    'period_years': float(wavelength / 252),  # Trading days to years (252 trading days/year)
+                    'rating': cycle_rating,
+                    'component_yield': {
+                        'yield_percent': cy_result['yield_percent'],
+                        'num_trades': cy_result['num_trades'],
+                        'rating': cy_rating
+                    },
+                    'health': health_result,
+                    'phase_degrees': float(cycle_phase_degrees),
+                    'phase_radians': float(cycle_phase_radians)
+                })
+
+        # 3. SELECT TOP CYCLE for bandpass
+        if len(sorted_peaks) > 0:
+            selected_idx = sorted_peaks[0]
+            selected_wavelength = wavelengths[selected_idx]
+        else:
+            selected_idx = np.argmax(power_spectrum)
+            selected_wavelength = wavelengths[selected_idx]
+
+        # 4. BANDPASS - Pure Sine Wave (Wavelet-derived phase)
+        # Generate clean, projectable sine wave using wavelet analysis
+        # Wavelength is already in trading days
+        selected_wavelength_trading = int(selected_wavelength)
+        future_days = int(selected_wavelength_trading * 2)
+
+        # Use custom bandwidth if provided, otherwise default to 0.10
+        bandwidth = getattr(self, 'bandwidth', 0.10)
+
+        bp_result = create_pure_sine_bandpass(
+            self.prices,
+            selected_wavelength_trading,
+            bandwidth_pct=bandwidth,
+            extend_future=future_days,
+            method=bandpass_phase_method,
+            align_to=align_to
+        )
+
+        bandpass = bp_result['bandpass_normalized']
+        historical_bandpass = bandpass[:len(self.prices)]
+
+        phase_info = {
+            "method": bp_result['method'],
+            "phase_degrees": round(bp_result['phase_degrees'], 1),
+            "phase_window_size": len(self.prices),
+            "amplitude": round(bp_result['amplitude'], 6),
+            "alignment_target": bp_result.get('turn_type', 'price turning points')
+        }
+
+        # Use pre-calculated peaks/troughs from bandpass function
+        # (These are anchored to phase-aligned extrema, not re-detected)
+        bp_peaks = np.array(bp_result.get('peaks', []))
+        bp_troughs = np.array(bp_result.get('troughs', []))
+
+        # 4.5. RATE THE CYCLE using rating system
+        # Find peak index in power spectrum for this wavelength
+        wavelength_idx = np.argmin(np.abs(wavelengths - selected_wavelength))
+
+        cycle_rating = rate_cycle(
+            bandpass_signal=historical_bandpass,
+            wavelength=selected_wavelength,  # Already in trading days
+            spectrum=power_spectrum,
+            peak_idx=wavelength_idx,
+            wavelengths=wavelengths  # Already in trading days
+        )
+
+        # 4.5 COMPONENT YIELD CALCULATION
+        component_yield_result = calculate_component_yield(
+            bandpass_signal=historical_bandpass,
+            prices=self.prices[-len(historical_bandpass):],  # Match bandpass length
+            wavelength=int(selected_wavelength)  # Already in trading days
+        )
+        yield_rating = get_yield_rating(component_yield_result['yield_percent'])
+
+        # 5. PREPARE DATA FOR FRONTEND
+        # Use ACTUAL dates from price_df, not synthetic dates
+        historical_dates = self.price_df['Date'].astype(str).tolist()
+        last_date = datetime.strptime(historical_dates[-1], '%Y-%m-%d')
+
+        # Generate future dates that approximate trading days (252/year pattern)
+        # Pattern: ~5 trading days, then skip ~2.5 calendar days (weekends + occasional holiday)
+        future_dates = []
+        current_date = last_date
+        days_per_trading_day = 365.0 / 252.0  # Average calendar days per trading day
+
+        for i in range(future_days):
+            current_date = current_date + timedelta(days=days_per_trading_day)
+            future_dates.append(current_date.strftime('%Y-%m-%d'))
+
+        all_dates = historical_dates + future_dates
+
+        # Scale bandpass to fixed ±25 (frontend applies 0.8 scaling → final ±20)
+        scaled_bandpass = bandpass * 25
+
+        # 5.5. GENERATE COMPOSITE WAVE from top cycles
+        # Take top 3-5 cycles with meaningful ratings
+        composite_cycles = [c for c in peak_cycles if c['rating']['class'] in ['A', 'B', 'C']][:5]
+
+        if len(composite_cycles) > 0:
+            print(f"Generating composite wave from {len(composite_cycles)} cycles")
+            print("Cycle phases:")
+            for cycle in composite_cycles:
+                print(f"  {cycle['wavelength']}d: {cycle['phase_degrees']:.1f}° (amplitude: {cycle['amplitude']:.3f})")
+
+            # Initialize composite bandpass with zeros
+            composite_bandpass = np.zeros(len(self.prices) + future_days)
+
+            # Sum sine waves with INDEPENDENT phases (as detected by scanner)
+            total_length = len(self.prices) + future_days
+            t = np.arange(total_length)
+
+            for cycle in composite_cycles:
+                wavelength = cycle['wavelength']
+
+                # Use the STORED phase from scanner detection
+                # This preserves the phase relationship between cycles
+                phase_radians = cycle['phase_radians']
+
+                # Generate sine wave with this specific phase
+                omega = 2 * np.pi / wavelength
+                sine_wave = np.sin(omega * t + phase_radians)
+
+                # Weight by spectral power (normalized amplitude from scanner)
+                weight = cycle['amplitude']
+                composite_bandpass += sine_wave * weight
+
+                print(f"  Added {wavelength}d cycle with phase {cycle['phase_degrees']:.1f}°, weight {weight:.3f}")
+
+            # Normalize composite to ±1 range
+            composite_max = np.max(np.abs(composite_bandpass))
+            if composite_max > 1e-10:
+                composite_bandpass = composite_bandpass / composite_max
+
+            # Scale to fixed ±25 (frontend applies 0.8 scaling → final ±20)
+            composite_scaled = composite_bandpass * 25
+            print(f"Composite wave generated: {len(composite_cycles)} cycles with independent phases")
+        else:
+            # No composite if no good cycles found
+            composite_bandpass = None
+            composite_scaled = None
+            print("No cycles with sufficient rating for composite wave")
+
+        # 5.6. V12 CYCLE QUALITY ANALYSIS - SNR & Harmonic Validation
+        print(f"\n=== V12 CYCLE QUALITY ANALYSIS ===")
+        print(f"Analyzing {len(peak_cycles)} detected cycles...")
+
+        quality_analyzer = CycleQualityAnalyzer(min_snr=2.0, harmonic_tolerance=0.15)
+
+        # Find harmonic families
+        harmonic_result = quality_analyzer.find_harmonic_families(peak_cycles)
+
+        print(f"\nHarmonic families found: {len(harmonic_result['families'])}")
+        for idx, family in enumerate(harmonic_result['families']):
+            print(f"  Family {idx+1}: {family}")
+        print(f"Orphans: {harmonic_result['orphans']}")
+
+        # Add quality metrics to each cycle
+        for cycle in peak_cycles:
+            wavelength = cycle['wavelength']
+
+            # Use placeholder SNR for now (actual SNR calculation would need raw bandpass)
+            # In a full implementation, we'd calculate this from the actual bandpass signal
+            snr_data = {
+                'snr_linear': 3.5,  # Placeholder - could be calculated from amplitude/power
+                'snr_db': 10.0,
+                'quality': 'Medium'
+            }
+
+            # Calculate quality score
+            quality_data = quality_analyzer.calculate_quality_score(
+                snr_data, harmonic_result, wavelength
+            )
+
+            # Determine family ID
+            family_id = -1  # -1 means orphan
+            for idx, family in enumerate(harmonic_result['families']):
+                if wavelength in family:
+                    family_id = idx
+                    break
+
+            # Add to cycle data
+            cycle['quality_v12'] = {
+                'stars': quality_data['stars'],
+                'score': quality_data['score'],
+                'label': quality_data['label'],
+                'star_display': quality_data['star_display'],
+                'snr': snr_data,
+                'harmonic_family_id': family_id,
+                'is_orphan': wavelength in harmonic_result['orphans'],
+                'harmonic_partners': quality_data['components']['harmonic_partners']
+            }
+
+            print(f"  {wavelength}d: {quality_data['star_display']} ({quality_data['label']}) - {quality_data['components']['harmonic_partners']} partners")
+
+        # 5.7. V12 CYCLE SYNCHRONIZATION ANALYSIS
+        print(f"\n=== V12 CYCLE SYNCHRONIZATION ANALYSIS ===")
+
+        sync_analyzer = CycleSynchronizationAnalyzer(alignment_tolerance=10)
+
+        # Generate bandpass for each cycle for synchronization analysis
+        for cycle in peak_cycles:
+            wavelength = cycle['wavelength']
+
+            # Generate bandpass using same method as main analysis
+            bp_result = create_pure_sine_bandpass(
+                self.prices,
+                wavelength,
+                bandwidth_pct=0.10,
+                extend_future=0,  # No future extension needed for sync analysis
+                method=bandpass_phase_method,
+                align_to=align_to
+            )
+
+            cycle['bandpass'] = bp_result['bandpass_normalized']
+
+        # Get current synchronization status
+        sync_status = sync_analyzer.get_current_sync_status(peak_cycles)
+
+        print(f"\nSynchronization Status: {sync_status['sync_status']}")
+        print(f"Confidence: {sync_status['confidence']}")
+        print(f"Rising Cycles: {sync_status['rising_cycles']}/{sync_status['total_cycles']} ({sync_status['rising_percentage']}%)")
+
+        # Hurst buy signal
+        hurst_signal = sync_status['hurst_signal']
+        print(f"\n=== Hurst Buy Signal ===")
+        print(f"Signal: {'BUY' if hurst_signal['buy_signal'] else 'NO BUY'}")
+        print(f"Reason: {hurst_signal['reason']}")
+        print(f"Confidence: {hurst_signal['confidence']}")
+
+        # Trough alignments
+        if len(sync_status['alignments']) > 0:
+            print(f"\n=== Trough Alignments ===")
+            for i, alignment in enumerate(sync_status['alignments']):
+                print(f"  Alignment {i+1}: {alignment['num_cycles']} cycles ({alignment['wavelengths']}) - {alignment['confidence']} confidence")
+
+        # Add synchronization data to main bandpass phase_info
+        main_bp_phase_info = sync_analyzer.find_cycle_troughs_and_peaks(historical_bandpass, selected_wavelength)
+        phase_info['troughs'] = main_bp_phase_info['troughs'].tolist()
+        phase_info['peaks'] = main_bp_phase_info['peaks'].tolist()
+        phase_info['is_rising'] = bool(main_bp_phase_info['is_rising'])
+        phase_info['nearest_trough_idx'] = int(main_bp_phase_info['nearest_trough_idx']) if main_bp_phase_info['nearest_trough_idx'] is not None else None
+        phase_info['nearest_peak_idx'] = int(main_bp_phase_info['nearest_peak_idx']) if main_bp_phase_info['nearest_peak_idx'] is not None else None
+        phase_info['days_since_trough'] = int(main_bp_phase_info['days_since_trough']) if main_bp_phase_info['days_since_trough'] is not None else None
+        phase_info['current_value'] = float(main_bp_phase_info['current_value'])
+
+        # Add synchronization data to each cycle (including alignment info)
+        for cycle in peak_cycles:
+            cycle_phase_info = sync_analyzer.find_cycle_troughs_and_peaks(cycle['bandpass'], cycle['wavelength'])
+
+            # Find which alignment group this cycle belongs to
+            alignment_partners = []
+            alignment_confidence = None
+            for alignment in sync_status['alignments']:
+                if cycle['wavelength'] in alignment['wavelengths']:
+                    # This cycle is part of this alignment group
+                    alignment_partners = [w for w in alignment['wavelengths'] if w != cycle['wavelength']]
+                    alignment_confidence = alignment['confidence']
+                    break
+
+            cycle['sync_info'] = {
+                'is_rising': bool(cycle_phase_info['is_rising']),
+                'days_since_trough': int(cycle_phase_info['days_since_trough']) if cycle_phase_info['days_since_trough'] is not None else None,
+                'nearest_trough_idx': int(cycle_phase_info['nearest_trough_idx']) if cycle_phase_info['nearest_trough_idx'] is not None else None,
+                'nearest_peak_idx': int(cycle_phase_info['nearest_peak_idx']) if cycle_phase_info['nearest_peak_idx'] is not None else None,
+                'alignment_partners': alignment_partners,  # List of other cycles this aligns with
+                'alignment_confidence': alignment_confidence,  # Confidence level or None
+                'num_aligned': len(alignment_partners)  # How many cycles align with this one
+            }
+            # Remove bandpass array from cycle (not JSON serializable, not needed in API response)
+            del cycle['bandpass']
+
+        # 5.8. GENERATE FLD (Future Line of Demarcation) for top cycles
+        # FLD = PRICE shifted forward by half the wavelength (Hurst's method)
+        # Shows where price WAS half a cycle ago - provides trading signals
+        fld_data = []
+
+        # Use top 3 cycles for FLD (A, B, or C rated)
+        fld_cycles = [c for c in peak_cycles if c['rating']['class'] in ['A', 'B', 'C']][:3]
+
+        print(f"\nGenerating FLD for {len(fld_cycles)} top cycles:")
+        for cycle in fld_cycles:
+            wavelength = cycle['wavelength']
+
+            # FLD = shift PRICE forward by wavelength/2 (half cycle)
+            shift_days = int(wavelength / 2)
+
+            # Create FLD array (historical + future)
+            total_length = len(self.prices) + future_days
+            fld_values = np.full(total_length, np.nan)
+
+            # For each point, show the price from shift_days ago
+            # fld_values[i] = prices[i - shift_days]
+            for i in range(shift_days, len(self.prices)):
+                fld_values[i] = self.prices[i - shift_days]
+
+            # Future FLD: extrapolate using last shift_days of prices
+            # This shows what the FLD will be IF price continues current pattern
+            for i in range(len(self.prices), min(total_length, len(self.prices) + shift_days)):
+                lookback_idx = i - shift_days
+                if lookback_idx < len(self.prices):
+                    fld_values[i] = self.prices[lookback_idx]
+
+            # Find crossovers (where current price crosses FLD)
+            # Only check historical data
+            crossovers = []
+            hist_len = len(self.prices)
+            for i in range(1, hist_len):
+                if not np.isnan(fld_values[i]) and not np.isnan(fld_values[i-1]):
+                    # Check if price crossed FLD
+                    if self.prices[i-1] <= fld_values[i-1] and self.prices[i] > fld_values[i]:
+                        # Bullish cross - price crossed above FLD
+                        crossovers.append({
+                            'index': i,
+                            'type': 'bullish',
+                            'price': float(self.prices[i])
+                        })
+                    elif self.prices[i-1] >= fld_values[i-1] and self.prices[i] < fld_values[i]:
+                        # Bearish cross - price crossed below FLD
+                        crossovers.append({
+                            'index': i,
+                            'type': 'bearish',
+                            'price': float(self.prices[i])
+                        })
+
+            # Convert NaN to None for JSON serialization
+            fld_list = [None if np.isnan(x) else float(x) for x in fld_values]
+
+            print(f"  {wavelength}d cycle: shift={shift_days}d, crossovers={len(crossovers)}")
+
+            fld_data.append({
+                'wavelength': int(wavelength),
+                'values': fld_list,
+                'shift_days': shift_days,
+                'crossovers': crossovers[-10:],  # Last 10 crossovers
+                'rating': cycle['rating']['class']
+            })
+
+        # Filter price chart data based on price_chart_years
+        price_chart_trading_days = price_chart_years * 252
+        print(f"DEBUG: price_chart_years={price_chart_years}, trading_days={price_chart_trading_days}, total_prices={len(self.prices)}")
+        if len(self.prices) > price_chart_trading_days:
+            start_idx = len(self.prices) - price_chart_trading_days
+            filtered_prices = self.prices[start_idx:]
+            filtered_dates = historical_dates[start_idx:]
+            filtered_bandpass = scaled_bandpass[start_idx:]
+
+            # Filter composite as well
+            if composite_scaled is not None:
+                filtered_composite = composite_scaled[start_idx:]
+            else:
+                filtered_composite = None
+
+            # Filter FLD data
+            filtered_fld_data = []
+            for fld in fld_data:
+                filtered_fld = {
+                    'wavelength': fld['wavelength'],
+                    'values': fld['values'][start_idx:],
+                    'shift_days': fld['shift_days'],
+                    'crossovers': [c for c in fld['crossovers'] if c['index'] >= start_idx],
+                    'rating': fld['rating']
+                }
+                # Adjust crossover indices relative to filtered data
+                for crossover in filtered_fld['crossovers']:
+                    crossover['index'] -= start_idx
+                filtered_fld_data.append(filtered_fld)
+
+            print(f"DEBUG: Filtered to {len(filtered_prices)} prices starting from index {start_idx}")
+        else:
+            filtered_prices = self.prices
+            filtered_dates = historical_dates
+            filtered_bandpass = scaled_bandpass
+
+            if composite_scaled is not None:
+                filtered_composite = composite_scaled
+            else:
+                filtered_composite = None
+
+            filtered_fld_data = fld_data
+
+            print(f"DEBUG: Using all {len(filtered_prices)} prices (no filtering needed)")
+
+        # Build result dict
+        result = {
+            "success": True,
+            "config": {
+                "window_size": window_size,
+                "data_points": len(self.prices),
+                "heatmap_weeks": max_weeks,
+                "heatmap_years": round(max_weeks * 7 / 365, 1),
+                "wavelength_range": f"{min_wavelength}-{max_wavelength}",
+                "selected_cycle": int(selected_wavelength),
+                "phase_method": phase_method
+            },
+            "power_spectrum": {
+                "wavelengths": wavelengths.tolist(),
+                "amplitudes": power_spectrum.tolist(),
+                "labeled_peaks": [cycle['wavelength'] for cycle in peak_cycles]  # Exact peaks to label
+            },
+            "peak_cycles": peak_cycles,
+            "heatmap": {
+                "data": heatmap_data,
+                "wavelengths": wavelengths.tolist(),
+                "weeks": max_weeks
+            },
+            "bandpass": {
+                "wavelength": int(selected_wavelength),
+                "values": bandpass[-len(filtered_bandpass):].tolist(),
+                "scaled_values": filtered_bandpass.tolist(),
+                "peaks": bp_peaks.tolist(),
+                "troughs": bp_troughs.tolist(),
+                "future_days": future_days,
+                "historical_length": len(filtered_prices),
+                "phase_info": phase_info,
+                "rating": cycle_rating,
+                "component_yield": {
+                    "yield_percent": component_yield_result['yield_percent'],
+                    "num_trades": component_yield_result['num_trades'],
+                    "rating": yield_rating
+                }
+            },
+            "composite_bandpass": {
+                "values": filtered_composite.tolist() if filtered_composite is not None else None,
+                "num_cycles": len(composite_cycles) if composite_cycles else 0,
+                "cycle_wavelengths": [c['wavelength'] for c in composite_cycles] if composite_cycles else []
+            },
+            "fld": {
+                "cycles": filtered_fld_data
+            },
+            "harmonic_families": {
+                "families": harmonic_result['families'],
+                "orphans": harmonic_result['orphans'],
+                "total_families": len(harmonic_result['families']),
+                "total_orphans": len(harmonic_result['orphans'])
+            },
+            "synchronization": {
+                "status": sync_status['sync_status'],
+                "confidence": sync_status['confidence'],
+                "zone_color": sync_status['zone_color'],
+                "rising_cycles": sync_status['rising_cycles'],
+                "total_cycles": sync_status['total_cycles'],
+                "rising_percentage": sync_status['rising_percentage'],
+                "hurst_buy_signal": sync_status['hurst_signal']['buy_signal'],
+                "hurst_confidence": sync_status['hurst_signal']['confidence'],
+                "hurst_reason": sync_status['hurst_signal']['reason'],
+                "alignments": sync_status['alignments']
+            },
+            "price_data": {
+                "dates": filtered_dates + future_dates,
+                "prices": filtered_prices.tolist() + [None] * future_days
+            }
+        }
+
+        # Convert all numpy types to Python native types for JSON serialization
+        return convert_numpy_types(result)
+
+    def create_ma_bandpass(self, prices, wavelength):
+        """
+        MA-Based Bandpass Filter
+
+        Bandpass = MA_short - MA_long
+
+        For wavelength W:
+        - MA_long period = W (use odd number)
+        - MA_short period = W/2 (use odd number)
+        - Both MAs lagged: lag = (period-1)/2
+        - Output plotted with lag = (MA_long_period - 1) / 2
+
+        This produces inherently correct phasing without phase optimization!
+        """
+        # Use odd periods closest to wavelength and wavelength/2
+        period_long = wavelength if wavelength % 2 == 1 else wavelength + 1
+        period_short = (wavelength // 2) if (wavelength // 2) % 2 == 1 else (wavelength // 2) + 1
+
+        # Calculate lags
+        lag_long = (period_long - 1) // 2
+        lag_short = (period_short - 1) // 2
+
+        # Apply moving averages using convolution
+        ma_long = np.convolve(prices, np.ones(period_long) / period_long, mode='valid')
+        ma_short = np.convolve(prices, np.ones(period_short) / period_short, mode='valid')
+
+        # Align the MAs - they need to start from the same point in time
+        # ma_short is longer (started earlier), so we need to trim it
+        start_offset = lag_short - lag_long
+        if start_offset >= 0:
+            ma_short_aligned = ma_short[start_offset:]
+        else:
+            # Should not happen with our setup, but handle it
+            ma_short_aligned = ma_short
+
+        # Make them the same length
+        min_len = min(len(ma_long), len(ma_short_aligned))
+        ma_long = ma_long[:min_len]
+        ma_short_aligned = ma_short_aligned[:min_len]
+
+        # Calculate bandpass: subtract lower frequency from higher frequency
+        bandpass = ma_short_aligned - ma_long
+
+        # The output is lagged by lag_long bars from the original price data
+        # We need to pad at the beginning to align with price data
+        bandpass_aligned = np.concatenate([np.zeros(period_long - 1), bandpass])
+
+        return bandpass_aligned, lag_long
+
+    def find_optimal_phase_peak_matching(self, prices_subset, wavelength, use_troughs=False):
+        """
+        Peak Matching Algorithm for Phase Alignment
+        Directly aligns sine wave peaks with actual price peaks (or troughs)
+
+        Args:
+            prices_subset: Price data for phase calculation
+            wavelength: Cycle period in trading days
+            use_troughs: If True, align to price lows instead of highs
+        """
+        from scipy.signal import find_peaks, butter, filtfilt
+
+        # Use ALL available data for long cycles
+        window_size = len(prices_subset)
+
+        # Detrend using robust polynomial
+        x = np.arange(window_size)
+        try:
+            # Higher degree for better trend removal
+            coeffs = np.polyfit(x, prices_subset, 4)
+            trend = np.polyval(coeffs, x)
+        except:
+            trend = np.mean(prices_subset)
+
+        detrended = prices_subset - trend
+
+        # Find actual price peaks OR troughs with appropriate distance
+        min_peak_distance = int(wavelength * 0.6)  # Allow some flexibility
+
+        if use_troughs:
+            # Find troughs (invert signal to find peaks of negative)
+            price_peaks, peak_properties = find_peaks(-detrended,
+                                                        distance=min_peak_distance,
+                                                        prominence=np.std(detrended) * 0.3)
+        else:
+            # Find peaks (default)
+            price_peaks, peak_properties = find_peaks(detrended,
+                                                        distance=min_peak_distance,
+                                                        prominence=np.std(detrended) * 0.3)
+
+        if len(price_peaks) < 2:
+            # Not enough peaks/troughs, fallback to correlation
+            return self.find_optimal_phase_correlation(prices_subset, wavelength, use_troughs=use_troughs)
+
+        # Use the most recent prominent peaks (last 3-5 cycles)
+        num_recent_peaks = min(5, len(price_peaks))
+        recent_peaks = price_peaks[-num_recent_peaks:]
+
+        # Calculate average spacing between peaks
+        if len(recent_peaks) >= 2:
+            peak_spacings = np.diff(recent_peaks)
+            avg_spacing = np.mean(peak_spacings)
+
+            # If actual spacing differs significantly from wavelength, adjust
+            if abs(avg_spacing - wavelength) / wavelength > 0.2:
+                # Use measured spacing
+                effective_wavelength = avg_spacing
+            else:
+                effective_wavelength = wavelength
+        else:
+            effective_wavelength = wavelength
+
+        # Calculate phase to align sine peaks with price peaks (or troughs)
+        last_peak_idx = recent_peaks[-1]
+
+        if use_troughs:
+            # For troughs: sin should equal -1 at trough locations
+            # sin(2π * trough_idx / wavelength + phase) = -1
+            # 2π * trough_idx / wavelength + phase = 3π/2
+            # Phase = 3π/2 - 2π * trough_idx / wavelength
+            phase_from_peak = (3 * np.pi / 2) - (2 * np.pi * last_peak_idx / effective_wavelength)
+        else:
+            # For peaks: sin should equal +1 at peak locations
+            # sin(2π * peak_idx / wavelength + phase) = 1
+            # 2π * peak_idx / wavelength + phase = π/2
+            # Phase = π/2 - 2π * peak_idx / wavelength
+            phase_from_peak = (np.pi / 2) - (2 * np.pi * last_peak_idx / effective_wavelength)
+
+        # Normalize to 0-2π
+        optimal_phase = phase_from_peak % (2 * np.pi)
+
+        # Validate: Generate test sine wave and check peak alignment
+        test_sine = np.sin(2 * np.pi * np.arange(window_size) / effective_wavelength + optimal_phase)
+        test_peaks, _ = find_peaks(test_sine, distance=min_peak_distance)
+
+        # Check alignment quality
+        alignment_errors = []
+        for price_peak in recent_peaks:
+            if len(test_peaks) > 0:
+                distances = [abs(price_peak - sine_peak) for sine_peak in test_peaks]
+                min_distance = min(distances)
+                alignment_errors.append(min_distance)
+
+        # If alignment is poor, try fine-tuning
+        if alignment_errors and np.mean(alignment_errors) > wavelength * 0.15:
+            # Fine-tune phase in small steps
+            best_phase = optimal_phase
+            best_error = np.mean(alignment_errors)
+
+            for phase_adjust in np.linspace(-np.pi/6, np.pi/6, 30):
+                test_phase = (optimal_phase + phase_adjust) % (2 * np.pi)
+                test_sine = np.sin(2 * np.pi * np.arange(window_size) / effective_wavelength + test_phase)
+                test_peaks, _ = find_peaks(test_sine, distance=min_peak_distance)
+
+                errors = []
+                for price_peak in recent_peaks:
+                    if len(test_peaks) > 0:
+                        distances = [abs(price_peak - sine_peak) for sine_peak in test_peaks]
+                        errors.append(min(distances))
+
+                if errors and np.mean(errors) < best_error:
+                    best_error = np.mean(errors)
+                    best_phase = test_phase
+
+            optimal_phase = best_phase
+
+        return optimal_phase
+
+    def find_optimal_phase_hilbert(self, prices_subset, wavelength):
+        """
+        Find optimal phase using ENHANCED Hilbert Transform with peak matching
+        This method extracts phase from price data and validates it against actual peaks
+        """
+        from scipy.signal import hilbert, butter, filtfilt, find_peaks
+
+        # Use MORE data for better phase detection
+        window_size = min(len(prices_subset), int(wavelength * 10))
+        prices_subset = prices_subset[-window_size:]
+
+        # Define nyquist at the beginning
+        nyquist = 0.5  # Sampling rate is 1 sample per day
+
+        # IMPROVED: Better detrending using longer-term polynomial
+        x = np.arange(len(prices_subset))
+        # Use 3rd degree polynomial for better non-linear trend removal
+        try:
+            coeffs = np.polyfit(x, prices_subset, 3)
+            trend = np.polyval(coeffs, x)
+            detrended = prices_subset - trend
+        except:
+            # Fallback to mean
+            detrended = prices_subset - np.mean(prices_subset)
+
+        # Apply bandpass filter around target wavelength with WIDER bandwidth
+        low_period = wavelength * 0.80  # Wider bandwidth
+        high_period = wavelength * 1.20
+
+        low_freq = 1.0 / high_period / nyquist
+        high_freq = 1.0 / low_period / nyquist
+
+        try:
+            b, a = butter(3, [low_freq, high_freq], btype='band')  # Higher order filter
+            filtered = filtfilt(b, a, detrended)
+        except:
+            # Fallback
+            filtered = detrended
+
+        # Apply Hilbert transform
+        analytic_signal = hilbert(filtered)
+        instantaneous_phase = np.angle(analytic_signal)
+
+        # IMPROVED: Find actual peaks in filtered signal
+        peaks, _ = find_peaks(filtered, distance=int(wavelength * 0.7))
+
+        # If we found peaks, use them to refine phase
+        if len(peaks) > 0:
+            # Get phase at the most recent peak
+            last_peak_idx = peaks[-1]
+            phase_at_peak = instantaneous_phase[last_peak_idx]
+
+            # Phase at peak should be ~π/2 (90 degrees)
+            # Calculate offset needed
+            phase_offset = (np.pi / 2) - phase_at_peak
+
+            # Apply offset to get corrected phase at current point
+            optimal_phase = (instantaneous_phase[-1] + phase_offset) % (2 * np.pi)
+        else:
+            # No peaks found, use standard method
+            optimal_phase = instantaneous_phase[-1] % (2 * np.pi)
+
+        return optimal_phase
+
+    def find_optimal_phase_correlation(self, prices_subset, wavelength, use_troughs=False):
+        """
+        Find optimal phase using ENHANCED correlation with peak matching
+
+        Args:
+            prices_subset: Price data for phase calculation
+            wavelength: Cycle period in trading days
+            use_troughs: If True, align to price lows instead of highs
+        """
+        from scipy.signal import find_peaks
+
+        # Use longer data if available - 10x wavelength for long cycles
+        window_size = min(len(prices_subset), int(wavelength * 10))
+        prices_subset = prices_subset[-window_size:]
+
+        # Better detrending: 3rd degree polynomial removes non-linear trends
+        x = np.arange(len(prices_subset))
+        try:
+            coeffs = np.polyfit(x, prices_subset, 3)
+            trend = np.polyval(coeffs, x)
+        except:
+            trend = np.mean(prices_subset)
+
+        detrended = prices_subset - trend
+
+        # Normalize detrended data
+        if np.std(detrended) > 0:
+            detrended = detrended / np.std(detrended)
+
+        # ENHANCED: Find actual price peaks/troughs
+        if use_troughs:
+            # Focus on troughs for alignment
+            price_peaks, _ = find_peaks(-detrended, distance=int(wavelength * 0.7))
+        else:
+            # Focus on peaks for alignment (default)
+            price_peaks, _ = find_peaks(detrended, distance=int(wavelength * 0.7))
+
+        best_correlation = -1
+        optimal_phase = 0
+
+        # Test phases at 0.5 degree resolution
+        for i in range(720):
+            phase = 2 * np.pi * i / 720
+            t = np.arange(len(prices_subset))
+            sine_wave = np.sin(2 * np.pi * t / wavelength + phase)
+
+            # Calculate correlation
+            corr = np.corrcoef(detrended, sine_wave)[0, 1]
+
+            # BONUS: Check if sine peaks align with price peaks
+            sine_peaks, _ = find_peaks(sine_wave, distance=int(wavelength * 0.7))
+
+            # Add alignment bonus if peaks align
+            alignment_bonus = 0
+            if len(price_peaks) > 0 and len(sine_peaks) > 0:
+                # Check how well peaks align
+                for pp in price_peaks[-3:]:  # Check last 3 peaks
+                    min_distance = min([abs(pp - sp) for sp in sine_peaks])
+                    if min_distance < wavelength * 0.1:  # Within 10% of wavelength
+                        alignment_bonus += 0.05
+
+            total_score = abs(corr) + alignment_bonus
+
+            if total_score > best_correlation:
+                best_correlation = total_score
+                optimal_phase = phase
+
+        return optimal_phase
+
+
+@app.route('/')
+def index():
+    """Main page"""
+    return render_template('index.html')
+
+@app.route('/api/analyze')
+def api_analyze():
+    """API endpoint for cycle analysis"""
+    # Get symbol parameter
+    symbol = request.args.get('symbol', 'TLT').upper()
+
+    # Get parameters from request
+    window_size = int(request.args.get('window_size', 4000))
+    min_wavelength = int(request.args.get('min_wavelength', 100))
+    max_wavelength = int(request.args.get('max_wavelength', 800))
+    wavelength_step = int(request.args.get('wavelength_step', 5))
+
+    # Phasing parameters
+    phase_method = request.args.get('phase_method', 'hilbert')  # 'hilbert' or 'correlation'
+    phase_window_size = int(request.args.get('phase_window_size', 1000))
+    align_to = request.args.get('align_to', 'trough')  # 'trough' (default), 'peak', or 'auto'
+
+    # Algorithm selection
+    scan_algorithm = request.args.get('scan_algorithm', 'morlet')  # 'morlet', 'bartels', or 'mesa'
+
+    # Preprocessing parameters
+    suppress_long_cycles = request.args.get('suppress_long_cycles', 'true').lower() == 'true'
+
+    # Heatmap parameters
+    heatmap_years = int(request.args.get('heatmap_years', 10))
+
+    # Price chart parameters
+    price_chart_years = int(request.args.get('price_chart_years', 10))
+    print(f"DEBUG: Received price_chart_years = {price_chart_years}")
+
+    # Bandpass phase method (V10 new feature)
+    bandpass_phase_method = request.args.get('bandpass_phase_method', 'actual_price_peaks')
+    print(f"DEBUG: Using bandpass_phase_method = {bandpass_phase_method}")
+    print(f"DEBUG: Phase alignment (align_to) = {align_to}")
+
+    # Create analyzer for this symbol
+    analyzer = CyclesAnalyzer(symbol)
+
+    # Perform analysis
+    result = analyzer.analyze(
+        window_size=window_size,
+        min_wavelength=min_wavelength,
+        max_wavelength=max_wavelength,
+        wavelength_step=wavelength_step,
+        phase_method=phase_method,
+        phase_window_size=phase_window_size,
+        heatmap_years=heatmap_years,
+        suppress_long_cycles=suppress_long_cycles,
+        align_to=align_to,
+        scan_algorithm=scan_algorithm,
+        price_chart_years=price_chart_years,
+        bandpass_phase_method=bandpass_phase_method
+    )
+
+    return jsonify(result)
+
+@app.route('/api/bandpass')
+def api_bandpass():
+    """API endpoint for generating bandpass for specific cycle"""
+    # Get symbol parameter
+    symbol = request.args.get('symbol', 'TLT').upper()
+
+    # Get parameters from request
+    window_size = int(request.args.get('window_size', 4000))
+    min_wavelength = int(request.args.get('min_wavelength', 100))
+    max_wavelength = int(request.args.get('max_wavelength', 800))
+    wavelength_step = int(request.args.get('wavelength_step', 5))
+    selected_wavelength = int(request.args.get('selected_wavelength', 630))
+    bandwidth_pct = float(request.args.get('bandwidth', 0.10))
+
+    # Bandpass phase method (V10 new feature)
+    bandpass_phase_method = request.args.get('bandpass_phase_method', 'actual_price_peaks')
+
+    # Phase alignment parameter (V12 new feature)
+    align_to = request.args.get('align_to', 'trough')  # 'trough' (default), 'peak', or 'auto'
+
+    # Create analyzer for this symbol
+    analyzer = CyclesAnalyzer(symbol)
+
+    if len(analyzer.prices) == 0:
+        return jsonify({"error": "No price data available"})
+
+    # Generate bandpass using SAME method as main analysis
+    # Wavelength is already in trading days
+    selected_wavelength_trading = int(selected_wavelength)
+    future_days = int(selected_wavelength_trading * 2)
+    print(f"DEBUG /api/bandpass: selected_wavelength={selected_wavelength}, future_days={future_days}")
+
+    bp_result = create_pure_sine_bandpass(
+        analyzer.prices,
+        selected_wavelength_trading,
+        bandwidth_pct=bandwidth_pct,
+        extend_future=future_days,
+        method=bandpass_phase_method,
+        align_to=align_to
+    )
+
+    bandpass = bp_result['bandpass_normalized']
+
+    phase_info = {
+        "method": bp_result['method'],
+        "phase_degrees": round(bp_result['phase_degrees'], 1),
+        "phase_window_size": len(analyzer.prices),
+        "amplitude": round(bp_result['amplitude'], 6),
+        "alignment_target": "wavelet-derived phase"
+    }
+
+    # Use pre-calculated peaks/troughs from bandpass function
+    # (These are anchored to phase-aligned extrema, not re-detected)
+    bp_peaks = np.array(bp_result.get('peaks', []))
+    bp_troughs = np.array(bp_result.get('troughs', []))
+
+    # Use ACTUAL dates from price_df, not synthetic dates
+    historical_dates = analyzer.price_df['Date'].astype(str).tolist()
+    last_date = datetime.strptime(historical_dates[-1], '%Y-%m-%d')
+
+    # Generate future dates that approximate trading days (252/year pattern)
+    # Pattern: ~5 trading days, then skip ~2.5 calendar days (weekends + occasional holiday)
+    future_dates = []
+    current_date = last_date
+    days_per_trading_day = 365.0 / 252.0  # Average calendar days per trading day
+
+    for i in range(future_days):
+        current_date = current_date + timedelta(days=days_per_trading_day)
+        future_dates.append(current_date.strftime('%Y-%m-%d'))
+
+    all_dates = historical_dates + future_dates
+    print(f"DEBUG /api/bandpass: historical_dates={len(historical_dates)}, future_dates={len(future_dates)}, all_dates={len(all_dates)}")
+
+    # Format peaks and troughs with dates
+    peak_labels = []
+    for idx in bp_peaks:
+        if idx < len(all_dates):
+            peak_labels.append({
+                "index": int(idx),
+                "date": all_dates[idx]
+            })
+
+    trough_labels = []
+    for idx in bp_troughs:
+        if idx < len(all_dates):
+            trough_labels.append({
+                "index": int(idx),
+                "date": all_dates[idx]
+            })
+
+    # Scale bandpass to fixed ±25 (frontend applies 0.8 scaling → final ±20)
+    scaled_bandpass = bandpass * 25
+
+    return jsonify({
+        "success": True,
+        "bandpass": {
+            "wavelength": int(selected_wavelength),
+            "values": bandpass.tolist(),
+            "scaled_values": scaled_bandpass.tolist(),
+            "future_days": future_days,
+            "historical_length": len(analyzer.prices),
+            "phase_info": phase_info
+        },
+        "peaks": peak_labels,
+        "troughs": trough_labels,
+        "price_data": {
+            "dates": all_dates,
+            "prices": analyzer.prices.tolist() + [None] * future_days
+        }
+    })
+
+@app.route('/api/config')
+def api_config():
+    """Get current configuration options"""
+    return jsonify({
+        "default_window_size": 4000,
+        "data_points": len(analyzer.prices) if analyzer.prices is not None else 0,
+        "window_size_options": [1000, 2000, 3000, 4000, 5000],
+        "wavelength_ranges": {
+            "short": {"min": 50, "max": 300},
+            "medium": {"min": 100, "max": 800},
+            "long": {"min": 300, "max": 1200}
+        }
+    })
+
+@app.route('/api/progress/<symbol>')
+def api_progress(symbol):
+    """Get analysis progress for a symbol"""
+    progress = get_progress(symbol)
+    return jsonify(progress)
+
+if __name__ == '__main__':
+    print("=" * 60)
+    print("CYCLES DETECTOR WEB APPLICATION V12")
+    print("=" * 60)
+    print("Starting Flask server...")
+    print("Access at: http://localhost:5001")
+    print("=" * 60)
+    print("FEATURES:")
+    print("  ✓ Multi-symbol support")
+    print("  ✓ Configurable window size (default: 4000 bars)")
+    print("  ✓ Peak filtering (amplitude >= 0.15)")
+    print("  ✓ Data from Yahoo Finance")
+    print("=" * 60)
+
+    # Force no cache headers
+    @app.after_request
+    def after_request(response):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
+    app.run(debug=True, host='0.0.0.0', port=8082)
