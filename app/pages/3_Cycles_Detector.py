@@ -1,182 +1,169 @@
-"""
-Cycles Detector V14 Integration
-Embeds the Flask-based Cycles Detector app
-"""
+"""Cycles Detector V14 - Embedded in Riley"""
 import streamlit as st
-import subprocess
-import time
 import requests
 from pathlib import Path
+import subprocess
+import os
+import signal
 
-# Page config
 st.set_page_config(
-    page_title="Cycles Detector - Riley Cycles Watch",
+    page_title="Cycles Detector - Riley",
     page_icon="📊",
     layout="wide"
 )
 
-# Get paths
+# Paths
 project_root = Path(__file__).parent.parent.parent
-cycles_detector_path = project_root / "cycles-detector"
-app_py = cycles_detector_path / "app.py"
+cycles_detector_dir = project_root / "cycles-detector"
+app_py = cycles_detector_dir / "app.py"
 
-# Flask server settings
-FLASK_PORT = 8082
-FLASK_URL = f"http://localhost:{FLASK_PORT}"
-
-st.title("📊 Cycles Detector V14")
-st.caption("Advanced cycle analysis using bandpass filtering and sine wave projection")
-
-# Check if Flask server is running
-def check_server_running():
-    """Check if Flask server is accessible"""
+def check_server_running(port=8082):
+    """Check if Flask server is running"""
     try:
-        response = requests.get(FLASK_URL, timeout=1)
+        response = requests.get(f"http://localhost:{port}", timeout=1)
         return response.status_code == 200
     except:
         return False
 
+def get_server_pid():
+    """Get PID of running Flask server"""
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "python3.*cycles-detector.*app.py"],
+            capture_output=True,
+            text=True
+        )
+        if result.stdout.strip():
+            return int(result.stdout.strip().split('\n')[0])
+    except:
+        pass
+    return None
+
+def start_server():
+    """Start Flask server in background"""
+    try:
+        # Start Flask server as background process
+        process = subprocess.Popen(
+            ["python3", "app.py"],
+            cwd=str(cycles_detector_dir),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
+        )
+        return process.pid
+    except Exception as e:
+        st.error(f"Failed to start server: {e}")
+        return None
+
+def stop_server():
+    """Stop Flask server"""
+    pid = get_server_pid()
+    if pid:
+        try:
+            os.kill(pid, signal.SIGTERM)
+            return True
+        except:
+            return False
+    return False
+
+# Check server status
 server_running = check_server_running()
 
-# Server status section
-col1, col2 = st.columns([3, 1])
+# Server controls in sidebar
+with st.sidebar:
+    st.subheader("Server Control")
 
-with col1:
     if server_running:
-        st.success(f"✅ Cycles Detector server is running at {FLASK_URL}")
-    else:
-        st.warning(f"⚠️  Cycles Detector server is not running")
-
-with col2:
-    if st.button("🔄 Refresh Status", use_container_width=True):
-        st.rerun()
-
-# Instructions and controls
-st.markdown("---")
-
-if not server_running:
-    st.info("""
-    **To use Cycles Detector:**
-
-    1. The Flask server needs to be running
-    2. You can start it manually from terminal:
-
-    ```bash
-    cd ~/riley-cycles/cycles-detector
-    python3 app.py
-    ```
-
-    Or use the button below to start it:
-    """)
-
-    if st.button("▶️  Start Cycles Detector Server", type="primary", use_container_width=True):
-        with st.spinner("Starting Cycles Detector server..."):
-            try:
-                # Start Flask server in background
-                subprocess.Popen(
-                    ["python3", str(app_py)],
-                    cwd=str(cycles_detector_path),
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-                time.sleep(3)  # Give server time to start
-                st.success("✅ Server started! Refreshing page...")
-                time.sleep(1)
+        st.success("✅ Server Running")
+        if st.button("🛑 Stop Server", use_container_width=True):
+            if stop_server():
+                st.success("Server stopped")
                 st.rerun()
-            except Exception as e:
-                st.error(f"❌ Failed to start server: {e}")
-                st.info("Please start manually from terminal")
+            else:
+                st.error("Failed to stop server")
+    else:
+        st.warning("⚠️ Server Not Running")
+        if st.button("▶️ Start Server", use_container_width=True, type="primary"):
+            with st.spinner("Starting Cycles Detector server..."):
+                pid = start_server()
+                if pid:
+                    import time
+                    # Wait for server to start
+                    for i in range(10):
+                        time.sleep(1)
+                        if check_server_running():
+                            st.success("Server started!")
+                            st.rerun()
+                            break
+                    else:
+                        st.error("Server started but not responding")
+                else:
+                    st.error("Failed to start server")
+
+# Main content
+if server_running:
+    # Embed Flask app in iframe - full screen
+    st.markdown("""
+    <style>
+        /* Remove default Streamlit padding */
+        .main .block-container {
+            padding-top: 0rem;
+            padding-bottom: 0rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+        /* Make iframe fill entire viewport */
+        iframe {
+            width: 100%;
+            height: calc(100vh - 100px);
+            border: none;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.components.v1.iframe("http://localhost:8082", height=2000, scrolling=True)
 
 else:
-    # Server is running - show options
-    st.markdown("""
-    **Cycles Detector V14 Features:**
-    - Bandpass filtering for cycle detection
-    - Sine wave projection aligned to price troughs
-    - Multiple wavelength analysis
-    - MESA heatmap visualization
-    - Accurate projection of future peaks/troughs
+    # Server not running - show instructions
+    st.info("👆 Click 'Start Server' in the sidebar to launch Cycles Detector")
 
-    **Choose how to access:**
+    st.markdown("---")
+
+    st.markdown("""
+    ### About Cycles Detector V14
+
+    **Features:**
+    - MESA Cycle Detection (John Ehlers)
+    - Morlet Wavelet Analysis
+    - Bandpass Filtering with sine wave projection
+    - Cycle Heatmaps
+    - Quality Metrics (Bartels test, component yield)
+    - Multi-Algorithm Support
+
+    **Data Source:**
+    - Uses shared CSV files in `data/price_history/`
+    - Auto-downloads on demand
+    - Shares data with RRG
+
+    **Usage:**
+    1. Click "Start Server" in the sidebar
+    2. Enter any ticker symbol (AAPL, MSFT, SPY, etc.)
+    3. Select wavelength range
+    4. View cycle projections and heatmaps
     """)
 
-    col1, col2 = st.columns(2)
+    st.markdown("---")
 
-    with col1:
-        if st.button("🖥️  Open in New Tab", use_container_width=True, type="primary"):
-            st.markdown(f'<meta http-equiv="refresh" content="0; url={FLASK_URL}" target="_blank">', unsafe_allow_html=True)
-            st.info(f"Opening {FLASK_URL} in new tab...")
-            st.markdown(f"[Click here if not redirected]({FLASK_URL})")
+    with st.expander("🔧 Manual Server Start (Alternative)"):
+        st.markdown("""
+        If the automatic start doesn't work, run this in a terminal:
 
-    with col2:
-        if st.button("📊 Embed Below", use_container_width=True):
-            st.session_state['show_embedded'] = True
-            st.rerun()
+        ```bash
+        cd /Users/bernie/Documents/AI/Riley\\ Project/cycles-detector
+        python3 app.py
+        ```
 
-    # Embedded view
-    if st.session_state.get('show_embedded', False):
-        st.markdown("---")
-        st.markdown(f"### Embedded Cycles Detector")
+        Then refresh this page.
+        """)
 
-        # Iframe embedding
-        iframe_html = f"""
-        <iframe
-            src="{FLASK_URL}"
-            width="100%"
-            height="1200"
-            frameborder="0"
-            style="border: 2px solid #444; border-radius: 4px;"
-        ></iframe>
-        """
-        st.markdown(iframe_html, unsafe_allow_html=True)
-
-        if st.button("❌ Close Embedded View"):
-            st.session_state['show_embedded'] = False
-            st.rerun()
-
-# Documentation section
-with st.expander("📖 About Cycles Detector V14"):
-    st.markdown("""
-    ### What is Cycles Detector?
-
-    Cycles Detector V14 is an advanced technical analysis tool that identifies and projects market cycles using:
-
-    **1. Bandpass Filtering**
-    - Isolates specific cycle frequencies from price data
-    - Removes noise while preserving cycle structure
-
-    **2. Pure Sine Wave Projection**
-    - Generates mathematically perfect sine waves
-    - Aligned to actual price troughs (bottom-fishing strategy)
-    - Projects future peaks and troughs with high accuracy
-
-    **3. MESA Heatmap**
-    - Visual representation of cycle strength across wavelengths
-    - Identifies dominant cycles in the market
-
-    ### Accuracy
-
-    According to testing:
-    - ✅ "Accurate down to the day" for cycle projections
-    - ✅ 100% test success rate (13/13 tests passed)
-    - ✅ Phase alignment correctly calculated (not hardcoded)
-
-    ### Use Case
-
-    Use Cycles Detector to:
-    - Identify dominant market cycles
-    - Project future turning points
-    - Plan entries at cycle troughs
-    - Validate cycle-based trading strategies
-
-    ### Technical Details
-
-    - Backend: Flask (Python)
-    - Algorithms: Bandpass filtering, Goertzel analysis, MESA
-    - Data: Real-time price data from Yahoo Finance
-    - Output: Interactive charts with cycle projections
-    """)
-
-# Footer
-st.markdown("---")
-st.caption(f"Cycles Detector V14 | Integrated into Riley Cycles Watch | Port: {FLASK_PORT}")
+st.caption("Cycles Detector V14 | Embedded Flask Application | Shared CSV Data")

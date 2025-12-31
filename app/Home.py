@@ -1350,25 +1350,17 @@ def render_rrg_view():
             show_tails = st.checkbox("Show Historical Tails", value=True)
             show_labels = st.checkbox("Show Symbol Labels", value=True)
 
-        # Load data from database
-        import sqlite3
-        db_path = get_db_path()
+        # Load data from CSV files
+        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+        from riley.modules.marketdata.csv_price_manager import load_rrg_data
 
-        query = """
-            SELECT date, symbol, open, high, low, close, volume
-            FROM price_bars_daily
-            ORDER BY date, symbol
-        """
-
-        conn = sqlite3.connect(str(db_path))
-        df_raw = pd.read_sql_query(query, conn)
-        conn.close()
+        df_raw = load_rrg_data()
 
         if df_raw.empty:
-            st.error("No price data found in database")
+            st.error("No price data found in CSV files")
             return
 
-        # Convert date column
+        # Convert date column (already datetime from CSV load)
         df_raw['date'] = pd.to_datetime(df_raw['date'])
 
         # Fetch custom symbols if provided
@@ -1640,18 +1632,28 @@ def main():
         st.sidebar.caption("📡 askSlim Scraper")
         st.sidebar.warning("Never run")
 
-    # Market Data status
-    cursor.execute("SELECT MAX(date) FROM price_bars_daily")
-    row = cursor.fetchone()
-    if row and row[0]:
-        market_date = pd.to_datetime(row[0]).strftime('%d-%b-%Y')
-        st.sidebar.caption("📈 Market Data")
-        st.sidebar.success(f"Last: {market_date}")
-    else:
-        st.sidebar.caption("📈 Market Data")
-        st.sidebar.warning("No data")
-
     conn.close()
+
+    # Market Data status (from CSV files)
+    try:
+        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+        from riley.modules.marketdata.csv_price_manager import get_price_history_dir
+
+        price_dir = get_price_history_dir()
+        csv_file = price_dir / "spy_history.csv"
+
+        if csv_file.exists():
+            df_check = pd.read_csv(csv_file)
+            last_date = pd.to_datetime(df_check['Date']).max()
+            market_date = last_date.strftime('%d-%b-%Y')
+            st.sidebar.caption("📈 Market Data")
+            st.sidebar.success(f"Last: {market_date}")
+        else:
+            st.sidebar.caption("📈 Market Data")
+            st.sidebar.warning("No CSV data")
+    except Exception as e:
+        st.sidebar.caption("📈 Market Data")
+        st.sidebar.warning(f"Error: {str(e)[:30]}")
 
     st.sidebar.caption("Use System Status page for manual updates")
     st.sidebar.divider()
