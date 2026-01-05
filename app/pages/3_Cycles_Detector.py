@@ -75,7 +75,7 @@ with st.sidebar:
 
     if server_running:
         st.success("✅ Server Running")
-        if st.button("🛑 Stop Server", use_container_width=True):
+        if st.button("🛑 Stop Server", width='stretch'):
             if stop_server():
                 st.success("Server stopped")
                 st.rerun()
@@ -83,7 +83,7 @@ with st.sidebar:
                 st.error("Failed to stop server")
     else:
         st.warning("⚠️ Server Not Running")
-        if st.button("▶️ Start Server", use_container_width=True, type="primary"):
+        if st.button("▶️ Start Server", width='stretch', type="primary"):
             with st.spinner("Starting Cycles Detector server..."):
                 pid = start_server()
                 if pid:

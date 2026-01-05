@@ -211,31 +211,55 @@ def render_today_view(scan_date: str, filters: dict, selected_symbol: str = None
     if 'sector' not in display_df.columns:
         display_df['sector'] = 'UNCLASSIFIED'
 
+    # Ensure directional_bias column exists and format with colors
+    if 'directional_bias' not in display_df.columns:
+        display_df['directional_bias'] = 'N/A'
+
+    # Format bias column with colored indicators (st.dataframe doesn't support custom cell styling)
+    # Map bias values exactly as scraped from askSlim
+    def format_bias(bias):
+        if bias == 'Bullish':
+            return '🟢 Bullish'
+        elif bias == 'Bearish':
+            return '🔴 Bearish'
+        elif bias == 'Neutral':
+            return '⚪ Neutral'
+        return bias if bias else 'N/A'
+
+    display_df['directional_bias'] = display_df['directional_bias'].apply(format_bias)
+
     # Show table with row selection (small radio button column on left)
-    # Order: symbol, name, Daily, →D, Weekly, →W, sector, Overlap
-    cols_to_show = ['symbol', 'name', 'Daily', '→D', 'Weekly', '→W', 'sector', 'Overlap']
+    # Order: symbol, name, Daily, →D, Weekly, →W, Bias, sector, Overlap
+    cols_to_show = ['symbol', 'name', 'Daily', '→D', 'Weekly', '→W', 'directional_bias', 'sector', 'Overlap']
     display_df = display_df[cols_to_show]
 
     event = st.dataframe(
         display_df,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         on_select="rerun",
-        selection_mode="single-row"
+        selection_mode="single-row",
+        column_config={
+            "directional_bias": st.column_config.TextColumn(
+                "Bias",
+                help="Directional bias from askSlim (exactly as scraped)"
+            )
+        }
     )
 
     # Determine which instrument to show
+    # Priority: 1) Sidebar search, 2) Table row selection
     show_symbol = selected_symbol  # From sidebar search
 
     if not show_symbol and event.selection and event.selection.rows:
-        # From table row selection
+        # From table row selection (only if no search selection)
         selected_idx = event.selection.rows[0]
         show_symbol = priority_df.iloc[selected_idx]['symbol']
 
     # Show instrument details
     if show_symbol:
         st.divider()
-        st.subheader(f"{show_symbol} - Details")
+        st.subheader(show_symbol)
         render_instrument_detail(show_symbol, scan_date)
 
 
@@ -246,21 +270,101 @@ def render_instrument_detail(symbol: str, scan_date: str):
     col1, col2 = st.columns(2)
 
     with col1:
-        # Analysis section - Directional Bias and Video
+        # Directional Bias
         analysis = detail.get('analysis', {})
         if analysis and analysis.get('directional_bias'):
             bias = analysis['directional_bias']
-            bias_color = "#d1e7dd" if bias == "Bullish" else "#f8d7da" if bias == "Bearish" else "#fff3cd"
-            bias_text_color = "#0f5132" if bias == "Bullish" else "#842029" if bias == "Bearish" else "#997404"
+            # Format bias with colored emoji to match table display
+            if bias == 'Bullish':
+                bias_display = '🟢 Bullish'
+            elif bias == 'Bearish':
+                bias_display = '🔴 Bearish'
+            elif bias == 'Neutral':
+                bias_display = '⚪ Neutral'
+            else:
+                bias_display = bias
 
-            st.markdown(f"### {bias} Bias")
+            st.markdown(f"### {bias_display}")
 
             if analysis.get('video_url'):
                 st.markdown(f"[📹 Watch Video Analysis]({analysis['video_url']})")
 
             st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-        # Cycles section - DISPLAY DB VALUES ONLY
+        # Cycle Status (moved under bias)
+        st.markdown("### Cycle Status")
+        scan_row = detail['scan_row']
+        cycle_specs = detail['cycle_specs']
+
+        if scan_row:
+            # Show sync status at the top
+            if scan_row.get('overlap_flag') == 1:
+                pill("✓ IN SYNC", bg="#d1e7dd", fg="#0f5132", border="#badbcc")
+
+            # Build daily status text
+            daily_lines = [f"**DAILY:**  \nStatus: {format_status(scan_row.get('daily_status', 'UNKNOWN'))}"]
+
+            # Calculate days remaining if in window
+            if scan_row.get('daily_status') == 'IN_WINDOW':
+                # Find daily cycle spec to get window end date
+                daily_spec = next((s for s in cycle_specs if s['timeframe'] == 'DAILY'), None)
+                if daily_spec and daily_spec.get('window_end_date'):
+                    from datetime import datetime
+                    scan_dt = datetime.strptime(scan_date, '%Y-%m-%d')
+                    end_dt = datetime.strptime(daily_spec['window_end_date'], '%Y-%m-%d')
+                    days_left = (end_dt - scan_dt).days
+                    if days_left >= 0:
+                        daily_lines.append(f"Days left in window: {days_left}")
+                    else:
+                        daily_lines.append("Window closed")
+                else:
+                    daily_lines.append("In window")
+            elif scan_row.get('days_to_daily_core_start') is not None:
+                days = int(scan_row['days_to_daily_core_start'])
+                if days >= 0:
+                    daily_lines.append(f"Days to start: {days}")
+                else:
+                    daily_lines.append("Started")
+
+            st.markdown("  \n".join(daily_lines))
+
+            # Build weekly status text
+            weekly_lines = [f"**WEEKLY:**  \nStatus: {format_status(scan_row.get('weekly_status', 'UNKNOWN'))}"]
+
+            # Calculate weeks remaining if in window
+            if scan_row.get('weekly_status') == 'IN_WINDOW':
+                weekly_spec = next((s for s in cycle_specs if s['timeframe'] == 'WEEKLY'), None)
+                if weekly_spec and weekly_spec.get('window_end_date'):
+                    from datetime import datetime
+                    scan_dt = datetime.strptime(scan_date, '%Y-%m-%d')
+                    end_dt = datetime.strptime(weekly_spec['window_end_date'], '%Y-%m-%d')
+                    weeks_left = (end_dt - scan_dt).days // 7
+                    if weeks_left >= 0:
+                        weekly_lines.append(f"Weeks left in window: {weeks_left}")
+                    else:
+                        weekly_lines.append("Window closed")
+                else:
+                    weekly_lines.append("In window")
+            elif scan_row.get('weeks_to_weekly_core_start') is not None:
+                weeks = int(scan_row['weeks_to_weekly_core_start'])
+                if weeks >= 0:
+                    weekly_lines.append(f"Weeks to start: {weeks}")
+                else:
+                    weekly_lines.append("Started")
+
+            st.markdown("  \n".join(weekly_lines))
+
+        # Astro events (moved under Cycle Status)
+        st.markdown("### Upcoming Astro Events")
+        if detail['astro_events']:
+            for event in detail['astro_events'][:5]:
+                role_icon = '' if event['role'] == 'PRIMARY' else ''
+                st.write(f"{role_icon} **{format_date(event['event_label'])}** - {event.get('name', 'Astro event')} ({event.get('category', 'N/A')})")
+        else:
+            pill("No upcoming astro events", bg="#e7f1ff", fg="#084298", border="#b6d4fe")
+
+    with col2:
+        # Cycles section (moved from left column)
         st.markdown("### Cycles")
         if detail['cycle_specs']:
             # Separate WEEKLY and DAILY for organized display
@@ -326,117 +430,229 @@ Support: {daily_support_fmt} | Resistance: {daily_resistance_fmt}
         else:
             st.info("No cycle specs")
 
-        # Cycle Status (below Cycles, removed "core" from labels)
-        st.markdown("### Cycle Status")
-        scan_row = detail['scan_row']
-        cycle_specs = detail['cycle_specs']
+    # FULL WIDTH SECTIONS BELOW COLUMNS
+    st.divider()
 
-        if scan_row:
-            # Show sync status at the top
-            if scan_row.get('overlap_flag') == 1:
-                pill("✓ IN SYNC", bg="#d1e7dd", fg="#0f5132", border="#badbcc")
+    # Desk Notes - Editable with toggle
+    st.markdown("### Desk Notes")
+    existing_note = detail['notes'][0] if detail['notes'] else None
+    existing_formatted = existing_note.get('bullets_formatted', '') if existing_note else ''
 
-            # Build daily status text
-            daily_lines = [f"**DAILY:**  \nStatus: {format_status(scan_row.get('daily_status', 'UNKNOWN'))}"]
+    # Toggle between view and edit mode
+    edit_notes_key = f"edit_notes_{symbol}"
+    if edit_notes_key not in st.session_state:
+        st.session_state[edit_notes_key] = False
 
-            # Calculate days remaining if in window
-            if scan_row.get('daily_status') == 'IN_WINDOW':
-                # Find daily cycle spec to get window end date
-                daily_spec = next((s for s in cycle_specs if s['timeframe'] == 'DAILY'), None)
-                if daily_spec and daily_spec.get('window_end_date'):
-                    from datetime import datetime
-                    scan_dt = datetime.strptime(scan_date, '%Y-%m-%d')
-                    end_dt = datetime.strptime(daily_spec['window_end_date'], '%Y-%m-%d')
-                    days_left = (end_dt - scan_dt).days
-                    if days_left >= 0:
-                        daily_lines.append(f"Days left in window: {days_left}")
-                    else:
-                        daily_lines.append("Window closed")
-                else:
-                    daily_lines.append("In window")
-            elif scan_row.get('days_to_daily_core_start') is not None:
-                days = int(scan_row['days_to_daily_core_start'])
-                if days >= 0:
-                    daily_lines.append(f"Days to start: {days}")
-                else:
-                    daily_lines.append("Started")
-
-            st.markdown("  \n".join(daily_lines))
-
-            # Build weekly status text
-            weekly_lines = [f"**WEEKLY:**  \nStatus: {format_status(scan_row.get('weekly_status', 'UNKNOWN'))}"]
-
-            # Calculate weeks remaining if in window
-            if scan_row.get('weekly_status') == 'IN_WINDOW':
-                weekly_spec = next((s for s in cycle_specs if s['timeframe'] == 'WEEKLY'), None)
-                if weekly_spec and weekly_spec.get('window_end_date'):
-                    from datetime import datetime
-                    scan_dt = datetime.strptime(scan_date, '%Y-%m-%d')
-                    end_dt = datetime.strptime(weekly_spec['window_end_date'], '%Y-%m-%d')
-                    weeks_left = (end_dt - scan_dt).days // 7
-                    if weeks_left >= 0:
-                        weekly_lines.append(f"Weeks left in window: {weeks_left}")
-                    else:
-                        weekly_lines.append("Window closed")
-                else:
-                    weekly_lines.append("In window")
-            elif scan_row.get('weeks_to_weekly_core_start') is not None:
-                weeks = int(scan_row['weeks_to_weekly_core_start'])
-                if weeks >= 0:
-                    weekly_lines.append(f"Weeks to start: {weeks}")
-                else:
-                    weekly_lines.append("Started")
-
-            st.markdown("  \n".join(weekly_lines))
-
-    with col2:
-        # Astro events
-        st.markdown("### Upcoming Astro Events")
-        if detail['astro_events']:
-            for event in detail['astro_events'][:5]:
-                role_icon = '' if event['role'] == 'PRIMARY' else ''
-                st.write(f"{role_icon} **{format_date(event['event_label'])}** - {event.get('name', 'Astro event')} ({event.get('category', 'N/A')})")
+    if not st.session_state[edit_notes_key]:
+        # Display mode
+        if existing_formatted:
+            st.markdown(existing_formatted)
         else:
-            pill("No upcoming astro events", bg="#e7f1ff", fg="#084298", border="#b6d4fe")
+            st.info("No desk notes yet")
 
-        # Desk notes (removed "Latest" from heading)
-        st.markdown("### Desk Notes")
-        if detail['notes']:
-            for note in detail['notes'][:3]:
-                try:
-                    bullets = json.loads(note.get('bullets_json', '[]'))
-                    for bullet in bullets:
-                        st.write(f"- {bullet}")
-                except:
-                    pass
-                st.divider()
+        if st.button("✏️ Edit Notes", key=f"btn_edit_notes_{symbol}"):
+            st.session_state[edit_notes_key] = True
+            st.rerun()
+    else:
+        # Edit mode
+        with st.form(f"desk_notes_{symbol}", clear_on_submit=False):
+            desk_notes_text = st.text_area(
+                "Markdown supported: **bold** *italic* # Heading - bullet > quote",
+                value=existing_formatted,
+                height=300,
+                key=f"desk_notes_today_{symbol}"
+            )
+
+            col_a, col_b = st.columns([1, 5])
+            with col_a:
+                save_notes = st.form_submit_button("💾 Save", width='stretch')
+            with col_b:
+                cancel_notes = st.form_submit_button("✖️ Cancel", width='content')
+
+            if save_notes:
+                success = db.update_desk_note_formatted(symbol, scan_date, desk_notes_text)
+                if success:
+                    st.session_state[edit_notes_key] = False
+                    st.success("Notes saved!")
+                    st.rerun()
+                else:
+                    st.error("Failed to save notes")
+
+            if cancel_notes:
+                st.session_state[edit_notes_key] = False
+                st.rerun()
+
+    # Analysis - Editable with toggle
+    st.markdown("### Analysis")
+    existing_analysis = existing_note.get('analysis', '') if existing_note else ''
+
+    # Toggle between view and edit mode
+    edit_analysis_key = f"edit_analysis_{symbol}"
+    if edit_analysis_key not in st.session_state:
+        st.session_state[edit_analysis_key] = False
+
+    if not st.session_state[edit_analysis_key]:
+        # Display mode
+        if existing_analysis:
+            st.markdown(existing_analysis)
         else:
-            st.info("No desk notes available")
+            st.info("No analysis yet")
 
-    # Charts / Media - FULL WIDTH BELOW COLUMNS
+        if st.button("✏️ Edit Analysis", key=f"btn_edit_analysis_{symbol}"):
+            st.session_state[edit_analysis_key] = True
+            st.rerun()
+    else:
+        # Edit mode
+        with st.form(f"analysis_{symbol}", clear_on_submit=False):
+            analysis_text = st.text_area(
+                "Markdown supported - write your full analysis here",
+                value=existing_analysis,
+                height=400,
+                placeholder="Market context, trade setup, risk assessment, technical analysis...",
+                key=f"analysis_today_{symbol}"
+            )
+
+            col_a, col_b = st.columns([1, 5])
+            with col_a:
+                save_analysis = st.form_submit_button("💾 Save", width='stretch')
+            with col_b:
+                cancel_analysis = st.form_submit_button("✖️ Cancel", width='content')
+
+            if save_analysis:
+                success = db.update_desk_note_analysis(symbol, scan_date, analysis_text)
+                if success:
+                    st.session_state[edit_analysis_key] = False
+                    st.success("Analysis saved!")
+                    st.rerun()
+                else:
+                    st.error("Failed to save analysis")
+
+            if cancel_analysis:
+                st.session_state[edit_analysis_key] = False
+                st.rerun()
+
+    # Charts / Media - FULL WIDTH BELOW COLUMNS with categorized tabs
     st.divider()
     st.markdown("### Charts")
-    project_root = Path(get_db_path()).parent.parent
-    media_folder = project_root / "media" / symbol
 
-    if media_folder.exists():
-        existing_images = sorted(list(media_folder.glob("*.*")))
-        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
-        # Filter for valid images and exclude hidden/system files
-        existing_images = [img for img in existing_images
-                          if img.suffix.lower() in image_extensions
-                          and not img.name.startswith('.')
-                          and not img.name.startswith('_')]
+    # Get media files from database
+    askslim_media = db.get_media_files(symbol, category='askslim')
+    tradingview_media = db.get_media_files(symbol, category='tradingview')
+    other_media = db.get_media_files(symbol, category='other')
 
-        if existing_images:
-            for img_path in existing_images:
-                # Use expander for each image to allow expanding/collapsing
-                with st.expander(f"{img_path.name}", expanded=True):
-                    st.image(str(img_path), use_container_width=True)
+    # Create tabs for different media categories
+    tab1, tab2, tab3 = st.tabs([
+        f"📊 AskSlim ({len(askslim_media)})",
+        f"📈 TradingView ({len(tradingview_media)})",
+        f"📁 Other ({len(other_media)})"
+    ])
+
+    with tab1:
+        if askslim_media:
+            for media in askslim_media:
+                caption = f"{media['timeframe']} - {media['upload_date']}" if media['timeframe'] else media['upload_date']
+                with st.expander(f"{media['file_name']}", expanded=True):
+                    st.image(media['file_path'], caption=caption, width='stretch')
+                    if media.get('notes'):
+                        st.caption(media['notes'])
         else:
-            st.info("No charts available")
-    else:
-        st.info("No charts available")
+            st.info("No AskSlim charts available. Charts will appear here after running the scraper.")
+
+    with tab2:
+        # Upload form for TradingView charts
+        with st.form(f"upload_tv_{symbol}", clear_on_submit=True):
+            st.markdown("**Upload TradingView Chart**")
+            uploaded_file = st.file_uploader("Select image", type=['png', 'jpg', 'jpeg'], key=f"tv_upload_{symbol}")
+            notes = st.text_input("Notes (optional)", key=f"tv_notes_{symbol}")
+
+            if st.form_submit_button("📤 Upload"):
+                if uploaded_file:
+                    from pathlib import Path
+                    from datetime import datetime
+
+                    # Save file
+                    media_folder = Path(f"media/{symbol}/tradingview")
+                    media_folder.mkdir(parents=True, exist_ok=True)
+                    file_path = media_folder / uploaded_file.name
+
+                    with open(file_path, 'wb') as f:
+                        f.write(uploaded_file.getbuffer())
+
+                    # Track in database
+                    db.insert_media_file(
+                        symbol=symbol,
+                        category='tradingview',
+                        file_path=str(file_path),
+                        file_name=uploaded_file.name,
+                        upload_date=datetime.now().strftime("%Y-%m-%d"),
+                        source='manual',
+                        notes=notes if notes else None
+                    )
+
+                    st.success(f"Uploaded {uploaded_file.name}")
+                    st.rerun()
+                else:
+                    st.error("Please select a file")
+
+        st.divider()
+
+        # Display existing charts
+        if tradingview_media:
+            for media in tradingview_media:
+                caption = media.get('notes') or media['file_name']
+                with st.expander(f"{media['file_name']}", expanded=True):
+                    st.image(media['file_path'], caption=caption, width='stretch')
+                    st.caption(f"Uploaded: {media['upload_date']}")
+        else:
+            st.info("No TradingView charts yet")
+
+    with tab3:
+        # Upload form for Other charts
+        with st.form(f"upload_other_{symbol}", clear_on_submit=True):
+            st.markdown("**Upload Other Chart**")
+            uploaded_file = st.file_uploader("Select image", type=['png', 'jpg', 'jpeg'], key=f"other_upload_{symbol}")
+            notes = st.text_input("Notes (optional)", key=f"other_notes_{symbol}")
+
+            if st.form_submit_button("📤 Upload"):
+                if uploaded_file:
+                    from pathlib import Path
+                    from datetime import datetime
+
+                    # Save file
+                    media_folder = Path(f"media/{symbol}/other")
+                    media_folder.mkdir(parents=True, exist_ok=True)
+                    file_path = media_folder / uploaded_file.name
+
+                    with open(file_path, 'wb') as f:
+                        f.write(uploaded_file.getbuffer())
+
+                    # Track in database
+                    db.insert_media_file(
+                        symbol=symbol,
+                        category='other',
+                        file_path=str(file_path),
+                        file_name=uploaded_file.name,
+                        upload_date=datetime.now().strftime("%Y-%m-%d"),
+                        source='manual',
+                        notes=notes if notes else None
+                    )
+
+                    st.success(f"Uploaded {uploaded_file.name}")
+                    st.rerun()
+                else:
+                    st.error("Please select a file")
+
+        st.divider()
+
+        # Display existing charts
+        if other_media:
+            for media in other_media:
+                caption = media.get('notes') or media['file_name']
+                with st.expander(f"{media['file_name']}", expanded=True):
+                    st.image(media['file_path'], caption=caption, width='stretch')
+                    st.caption(f"Uploaded: {media['upload_date']}")
+        else:
+            st.info("No other charts yet")
 
 
 def render_database_view(filters: dict = None):
@@ -460,7 +676,7 @@ def render_database_view(filters: dict = None):
         help="Enter a symbol or alias to jump to that instrument",
         key="db_search_input"
     )
-    search_button = st.button("Search", use_container_width=True)
+    search_button = st.button("Search", width='stretch')
 
     # Handle search with alias resolution
     if search_button and search_input:
@@ -505,7 +721,7 @@ def render_database_view(filters: dict = None):
     # Add row selection using dataframe selection
     event = st.dataframe(
         display_df,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         on_select="rerun",
         selection_mode="single-row",
@@ -597,11 +813,6 @@ def render_database_view(filters: dict = None):
                 help="Classification sector (e.g., METALS, INDICES, ENERGY)",
                 key=f"sector_{symbol}"
             )
-            active = st.checkbox(
-                "Active",
-                value=bool(instrument.get('active', True)),
-                key=f"active_{symbol}"
-            )
 
         with col2:
             aliases = st.text_area(
@@ -617,7 +828,6 @@ def render_database_view(filters: dict = None):
         if submitted:
             fields = {
                 'sector': sector,
-                'active': 1 if active else 0,
                 'aliases': aliases.strip() if aliases else None
             }
             success = db.update_instrument_taxonomy(symbol, fields)
@@ -762,16 +972,20 @@ def render_database_view(filters: dict = None):
     if notes_history:
         st.markdown("**Notes History** (newest first):")
         for note in notes_history:
-            # Just show the bullets, no metadata
-            try:
-                bullets = json.loads(note.get('bullets_json', '[]'))
-                for bullet in bullets:
-                    st.write(f"- {bullet}")
-            except:
-                # Fallback to notes field if bullets_json fails
-                text = note.get('notes', '')
-                if text:
-                    st.markdown(text)
+            # Try formatted content first, fall back to bullets_json
+            formatted = note.get('bullets_formatted')
+            if formatted:
+                st.markdown(formatted)
+            else:
+                try:
+                    bullets = json.loads(note.get('bullets_json', '[]'))
+                    for bullet in bullets:
+                        st.write(f"- {bullet}")
+                except:
+                    # Fallback to notes field if bullets_json fails
+                    text = note.get('notes', '')
+                    if text:
+                        st.markdown(text)
             st.divider()
     else:
         st.info("No notes history for this instrument.")
@@ -785,17 +999,22 @@ def render_database_view(filters: dict = None):
     latest_note = notes_history[0] if notes_history else None
     note_date = latest_note['asof_td_label'] if latest_note else datetime.now().strftime('%Y-%m-%d')
 
-    # Get existing note content
+    # Get existing note content - prefer formatted over plain text
+    existing_formatted = note_data.get('bullets_formatted', '')
     existing_text = note_data.get('text', '')
 
+    # Use formatted if available, otherwise fall back to plain text
+    editor_content = existing_formatted if existing_formatted else existing_text
+
     with st.form(f"edit_notes_{symbol}"):
-        # Simple text area - loads existing note content
+        # Markdown-enabled text area with formatting controls
+        st.markdown("**Format with Markdown:** `**bold**` `*italic*` `# Heading` `- bullet` `> quote`")
         note_text = st.text_area(
-            "Desk Notes",
-            value=existing_text,
+            "Desk Notes (Markdown Supported)",
+            value=editor_content,
             height=200,
-            help="Edit your desk note here. Each line becomes a bullet point.",
-            placeholder="- Point 1\n- Point 2\n- Point 3",
+            help="Use markdown formatting: **bold**, *italic*, # headings, - bullets, > quotes, [links](url)",
+            placeholder="# Trading Notes\n\n**Key Levels:**\n- Support: 5000\n- Resistance: 5100\n\n> Market showing bullish momentum",
             key=f"note_text_{symbol}"
         )
 
@@ -808,7 +1027,8 @@ def render_database_view(filters: dict = None):
         notes_submitted = st.form_submit_button("💾 Save Note")
 
         if notes_submitted:
-            # Save with the existing note's date (or today if new)
+            # Save to bullets_formatted field (markdown content)
+            # Also save to legacy fields for backwards compatibility
             success = db.upsert_note(
                 instrument_id=instrument_id,
                 asof_td_label=note_date,
@@ -817,7 +1037,9 @@ def render_database_view(filters: dict = None):
                 source='Manual Entry'
             )
 
+            # Update formatted content
             if success:
+                db.update_desk_note_formatted(symbol, note_date, note_text)
                 st.success(f"✅ Saved desk note for {symbol} successfully!")
                 st.rerun()
             else:
@@ -826,60 +1048,186 @@ def render_database_view(filters: dict = None):
     st.divider()
 
     # ========================================================================
-    # SECTION 5: MEDIA UPLOAD (CHARTS/IMAGES)
+    # SECTION 4.5: ANALYSIS JOURNAL
     # ========================================================================
-    st.subheader("5. Charts & Media")
+    st.subheader("4.5. Analysis Journal")
+
+    # Get existing analysis
+    existing_analysis = note_data.get('analysis', '')
+
+    with st.form(f"edit_analysis_{symbol}"):
+        analysis_text = st.text_area(
+            "Long-form Analysis",
+            value=existing_analysis,
+            height=300,
+            help="Write your detailed analysis, trade plan, or journal entry here. Supports markdown formatting.",
+            placeholder="Market context, trade setup, risk assessment, technical analysis...\n\nSupports:\n- **bold**, *italic*\n- # Headings\n- [links](url)\n- > quotes",
+            key=f"analysis_text_{symbol}"
+        )
+
+        st.caption(f"Analysis for date: {note_date}")
+        analysis_submitted = st.form_submit_button("💾 Save Analysis")
+
+        if analysis_submitted:
+            success = db.update_desk_note_analysis(
+                symbol,
+                note_date,
+                analysis_text
+            )
+
+            if success:
+                st.success(f"✅ Saved analysis for {symbol} successfully!")
+                st.rerun()
+            else:
+                st.error(f"❌ Failed to save analysis")
+
+    st.divider()
+
+    # ========================================================================
+    # SECTION 5: MEDIA UPLOAD (CHARTS/IMAGES) - Categorized Management
+    # ========================================================================
+    st.subheader("5. Charts & Media Management")
 
     # Get media folder for this symbol
     project_root = Path(get_db_path()).parent.parent
     media_folder = project_root / "media" / symbol
     media_folder.mkdir(parents=True, exist_ok=True)
 
-    # Show existing images
-    existing_images = sorted(list(media_folder.glob("*.*")))
-    image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp']
-    existing_images = [img for img in existing_images if img.suffix.lower() in image_extensions]
+    # Create tabs for upload and management
+    upload_tab, manage_tab = st.tabs(["📤 Upload Charts", "🗂️ Manage Charts"])
 
-    if existing_images:
-        st.markdown(f"**Current Charts ({len(existing_images)}):**")
+    with upload_tab:
+        st.markdown("**Upload TradingView or Other Charts** *(AskSlim charts are auto-managed by scraper)*")
 
-        # Display thumbnails in a grid
-        cols_per_row = 3
-        for i in range(0, len(existing_images), cols_per_row):
-            cols = st.columns(cols_per_row)
-            for j, col in enumerate(cols):
-                idx = i + j
-                if idx < len(existing_images):
-                    img_path = existing_images[idx]
-                    with col:
-                        st.image(str(img_path), use_container_width=True)
-                        st.caption(img_path.name)
-                        if st.button(f"🗑️ Delete", key=f"del_{symbol}_{idx}"):
-                            img_path.unlink()
-                            st.success(f"Deleted {img_path.name}")
+        with st.form(f"upload_media_{symbol}"):
+            col1, col2 = st.columns(2)
+
+            with col1:
+                category = st.selectbox(
+                    "Category",
+                    ["tradingview", "other"],
+                    format_func=lambda x: "📈 TradingView" if x == "tradingview" else "📁 Other"
+                )
+
+            with col2:
+                timeframe = st.selectbox(
+                    "Timeframe (optional)",
+                    [None, "DAILY", "WEEKLY"],
+                    format_func=lambda x: "Not specified" if x is None else x
+                )
+
+            notes = st.text_input("Notes (optional)", help="Add context about this chart")
+
+            uploaded_files = st.file_uploader(
+                "Select image files",
+                type=['jpg', 'jpeg', 'png', 'gif', 'webp'],
+                accept_multiple_files=True,
+                key=f"media_upload_{symbol}"
+            )
+
+            upload_submitted = st.form_submit_button(f"💾 Upload {len(uploaded_files) if uploaded_files else 0} file(s)")
+
+            if upload_submitted and uploaded_files:
+                # Create category subfolder
+                category_folder = media_folder / category
+                category_folder.mkdir(parents=True, exist_ok=True)
+
+                for uploaded_file in uploaded_files:
+                    # Save file
+                    file_path = category_folder / uploaded_file.name
+                    with open(file_path, 'wb') as f:
+                        f.write(uploaded_file.getbuffer())
+
+                    # Track in database
+                    try:
+                        db.insert_media_file(
+                            symbol=symbol,
+                            category=category,
+                            file_path=str(file_path),
+                            file_name=uploaded_file.name,
+                            upload_date=datetime.now().strftime("%Y-%m-%d"),
+                            source='manual',
+                            timeframe=timeframe,
+                            notes=notes
+                        )
+                    except Exception as e:
+                        st.error(f"Database error: {e}")
+
+                st.success(f"✅ Uploaded {len(uploaded_files)} file(s) to {category.upper()} category!")
+                st.rerun()
+
+    with manage_tab:
+        st.markdown("**All Charts** *(grouped by category)*")
+
+        # Get all media from database
+        all_media = db.get_media_files(symbol)
+
+        if all_media:
+            # Group by category
+            askslim_charts = [m for m in all_media if m['category'] == 'askslim']
+            tv_charts = [m for m in all_media if m['category'] == 'tradingview']
+            other_charts = [m for m in all_media if m['category'] == 'other']
+
+            # AskSlim section (read-only - managed by scraper)
+            if askslim_charts:
+                st.markdown("#### 📊 AskSlim Charts (Auto-managed)")
+                st.caption("⚠️ These are automatically managed by the scraper and cannot be manually deleted")
+                for media in askslim_charts[:5]:  # Show latest 5
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.write(f"**{media['file_name']}** - {media['timeframe']} ({media['upload_date']})")
+                    with col2:
+                        if Path(media['file_path']).exists():
+                            st.image(media['file_path'], width=100)
+
+            # TradingView section (user can delete)
+            if tv_charts:
+                st.markdown("#### 📈 TradingView Charts")
+                for media in tv_charts:
+                    col1, col2, col3 = st.columns([3, 1, 1])
+                    with col1:
+                        st.write(f"**{media['file_name']}**")
+                        if media.get('notes'):
+                            st.caption(media['notes'])
+                        st.caption(f"Uploaded: {media['upload_date']}")
+                    with col2:
+                        if Path(media['file_path']).exists():
+                            st.image(media['file_path'], width=100)
+                    with col3:
+                        if st.button("🗑️", key=f"del_tv_{media['media_id']}"):
+                            # Delete from database
+                            db.delete_media_file(media['media_id'])
+                            # Delete file
+                            if Path(media['file_path']).exists():
+                                Path(media['file_path']).unlink()
+                            st.success("Deleted!")
                             st.rerun()
-    else:
-        st.info("No charts uploaded yet")
 
-    # Upload new images
-    st.markdown("**Upload New Charts:**")
-    uploaded_files = st.file_uploader(
-        "Drop image files here",
-        type=['jpg', 'jpeg', 'png', 'gif', 'webp'],
-        accept_multiple_files=True,
-        key=f"media_upload_{symbol}"
-    )
+            # Other section (user can delete)
+            if other_charts:
+                st.markdown("#### 📁 Other Charts")
+                for media in other_charts:
+                    col1, col2, col3 = st.columns([3, 1, 1])
+                    with col1:
+                        st.write(f"**{media['file_name']}**")
+                        if media.get('notes'):
+                            st.caption(media['notes'])
+                        st.caption(f"Uploaded: {media['upload_date']}")
+                    with col2:
+                        if Path(media['file_path']).exists():
+                            st.image(media['file_path'], width=100)
+                    with col3:
+                        if st.button("🗑️", key=f"del_other_{media['media_id']}"):
+                            # Delete from database
+                            db.delete_media_file(media['media_id'])
+                            # Delete file
+                            if Path(media['file_path']).exists():
+                                Path(media['file_path']).unlink()
+                            st.success("Deleted!")
+                            st.rerun()
 
-    if uploaded_files:
-        if st.button(f"💾 Save {len(uploaded_files)} file(s)", key=f"save_media_{symbol}"):
-            for uploaded_file in uploaded_files:
-                # Save with original filename
-                file_path = media_folder / uploaded_file.name
-                with open(file_path, 'wb') as f:
-                    f.write(uploaded_file.getbuffer())
-
-            st.success(f"✅ Uploaded {len(uploaded_files)} file(s) successfully!")
-            st.rerun()
+        else:
+            st.info("No charts available. Upload some or run the askSlim scraper.")
 
 
 def render_calendar_view():
@@ -1259,7 +1607,7 @@ def render_rrg_view():
         preset_selected = None
         for idx, (name, symbols) in enumerate(preset_groups.items()):
             col = cols[idx % 2]
-            if col.button(name, use_container_width=True, key=f"preset_{idx}"):
+            if col.button(name, width='stretch', key=f"preset_{idx}"):
                 preset_selected = symbols
 
         # Custom instruments input
@@ -1529,7 +1877,7 @@ def render_rrg_view():
             'modeBarButtonsToAdd': ['zoom2d', 'pan2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d'],
             'scrollZoom': True
         }
-        st.plotly_chart(fig, use_container_width=True, config=config)
+        st.plotly_chart(fig, width='stretch', config=config)
 
         st.divider()
 
@@ -1577,7 +1925,7 @@ def render_rrg_view():
 
         # Calculate appropriate height based on number of rows (35px per row + 38px header)
         table_height = min(len(display_df) * 35 + 38, 500)
-        st.dataframe(display_df, use_container_width=True, hide_index=True, height=table_height)
+        st.dataframe(display_df, width='stretch', hide_index=True, height=table_height)
 
         # Export button
         st.divider()
@@ -1666,7 +2014,12 @@ def main():
     )
 
     # Instrument Search (for TODAY view only)
-    selected_instrument = None
+    # Initialize session state for search selection
+    if "today_selected_symbol" not in st.session_state:
+        st.session_state["today_selected_symbol"] = None
+
+    selected_instrument = st.session_state["today_selected_symbol"]
+
     if view == "TODAY":
         st.sidebar.divider()
         st.sidebar.subheader("Instrument Search")
@@ -1677,7 +2030,11 @@ def main():
             key="instrument_search"
         )
 
-        search_button = st.sidebar.button("Search", use_container_width=True)
+        col_search, col_clear = st.sidebar.columns([2, 1])
+        with col_search:
+            search_button = st.button("Search", width='stretch')
+        with col_clear:
+            clear_button = st.button("Clear", width='stretch')
 
         if search_button and search_input:
             # Resolve alias to canonical symbol
@@ -1688,12 +2045,18 @@ def main():
             matches = all_instruments[all_instruments['symbol'].str.upper() == canonical_symbol.upper()]
 
             if not matches.empty:
-                selected_instrument = matches.iloc[0]['symbol']
+                st.session_state["today_selected_symbol"] = matches.iloc[0]['symbol']
+                selected_instrument = st.session_state["today_selected_symbol"]
                 # Show resolution message if alias was used
                 if canonical_symbol.upper() != search_input.strip().upper():
                     st.sidebar.info(f"'{search_input}' → {canonical_symbol}")
             else:
                 st.sidebar.error(f"Instrument '{search_input}' not found")
+
+        if clear_button:
+            st.session_state["today_selected_symbol"] = None
+            selected_instrument = None
+            st.rerun()
 
     # Global filters
     st.sidebar.divider()

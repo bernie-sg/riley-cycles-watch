@@ -16,5 +16,5 @@ CREATE TABLE IF NOT EXISTS astro_events (
     UNIQUE(instrument_id, td_index, role)
 );
 
-CREATE INDEX idx_astro_instrument_td ON astro_events(instrument_id, td_index);
-CREATE INDEX idx_astro_instrument_role ON astro_events(instrument_id, role);
+CREATE INDEX IF NOT EXISTS idx_astro_instrument_td ON astro_events(instrument_id, td_index);
+CREATE INDEX IF NOT EXISTS idx_astro_instrument_role ON astro_events(instrument_id, role);

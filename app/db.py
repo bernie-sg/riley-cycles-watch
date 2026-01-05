@@ -128,6 +128,7 @@ class CyclesDB:
             SELECT
                 i.symbol,
                 i.name,
+                i.sector,
 
                 -- DAILY status (simple date comparison)
                 CASE
@@ -196,11 +197,16 @@ class CyclesDB:
                 d.daily_end,
                 w.weekly_median,
                 w.weekly_start,
-                w.weekly_end
+                w.weekly_end,
+
+                -- Directional bias from askSlim
+                COALESCE(ia.directional_bias, 'N/A') as directional_bias
 
             FROM instruments i
             LEFT JOIN daily_cycles d ON d.instrument_id = i.instrument_id
             LEFT JOIN weekly_cycles w ON w.instrument_id = i.instrument_id
+            LEFT JOIN instrument_analysis ia ON ia.instrument_id = i.instrument_id
+                AND ia.status = 'ACTIVE'
             WHERE i.active = 1
                 AND i.role = 'CANONICAL'
         """
@@ -214,15 +220,13 @@ class CyclesDB:
         ]
 
         # Add filters
-        # Note: group_name column doesn't exist in current schema
-        # if filters.get('group_name'):
-        #     query += " AND i.group_name = ?"
-        #     params.append(filters['group_name'])
+        if filters.get('group_name'):
+            query += " AND i.group_name = ?"
+            params.append(filters['group_name'])
 
-        # Note: sector column doesn't exist in current schema
-        # if filters.get('sector'):
-        #     query += " AND i.sector = ?"
-        #     params.append(filters['sector'])
+        if filters.get('sector'):
+            query += " AND i.sector = ?"
+            params.append(filters['sector'])
 
         # Status filter
         status_filter_applied = False
@@ -238,8 +242,8 @@ class CyclesDB:
                 query += " AND overlap_flag = 1"
                 status_filter_applied = True
 
-        # Order and limit
-        query += " ORDER BY i.symbol LIMIT 50"
+        # Order
+        query += " ORDER BY i.symbol"
 
         df = pd.read_sql_query(query, conn, params=params)
         conn.close()
@@ -402,14 +406,13 @@ class CyclesDB:
         if filters.get('active_only'):
             query += " AND active = 1"
 
-        # Note: group_name, sector, and other taxonomy columns don't exist in current schema
-        # if filters.get('group_name'):
-        #     query += " AND group_name = ?"
-        #     params.append(filters['group_name'])
+        if filters.get('group_name'):
+            query += " AND group_name = ?"
+            params.append(filters['group_name'])
 
-        # if filters.get('sector'):
-        #     query += " AND sector = ?"
-        #     params.append(filters['sector'])
+        if filters.get('sector'):
+            query += " AND sector = ?"
+            params.append(filters['sector'])
 
         query += " ORDER BY role, symbol"
 
@@ -1001,4 +1004,250 @@ class CyclesDB:
             conn.rollback()
             conn.close()
             print(f"Error deleting desk note: {e}")
+            return False
+
+    def update_desk_note_analysis(self, symbol: str, asof_td_label: str,
+                                  analysis_text: str) -> bool:
+        """Update or insert the analysis field in desk_notes.
+
+        Args:
+            symbol: Instrument symbol
+            asof_td_label: Trading day label (YYYY-MM-DD format)
+            analysis_text: Long-form analysis text
+
+        Returns:
+            True if successful, False on error
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Get instrument_id
+            cursor.execute("SELECT instrument_id FROM instruments WHERE symbol = ?",
+                          (symbol,))
+            row = cursor.fetchone()
+            if not row:
+                conn.close()
+                return False
+            instrument_id = row['instrument_id']
+
+            # UPSERT: Insert if new, update if exists
+            cursor.execute(
+                """INSERT INTO desk_notes (
+                       instrument_id, asof_td_label, author, bullets_json,
+                       created_at, analysis
+                   )
+                   VALUES (?, ?, 'Bernard', '[]', datetime('now'), ?)
+                   ON CONFLICT(instrument_id, asof_td_label)
+                   DO UPDATE SET
+                       analysis = excluded.analysis,
+                       updated_at = datetime('now')
+                """,
+                (instrument_id, asof_td_label, analysis_text)
+            )
+            conn.commit()
+            conn.close()
+            return True
+
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            print(f"Error updating analysis: {e}")
+            return False
+
+    def update_desk_note_formatted(self, symbol: str, asof_td_label: str,
+                                   formatted_content: str) -> bool:
+        """Update or insert the bullets_formatted field in desk_notes.
+
+        Args:
+            symbol: Instrument symbol
+            asof_td_label: Trading day label (YYYY-MM-DD format)
+            formatted_content: Rich text HTML/Markdown content
+
+        Returns:
+            True if successful, False on error
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Get instrument_id
+            cursor.execute("SELECT instrument_id FROM instruments WHERE symbol = ?",
+                          (symbol,))
+            row = cursor.fetchone()
+            if not row:
+                conn.close()
+                return False
+            instrument_id = row['instrument_id']
+
+            # UPSERT: Insert if new, update if exists
+            cursor.execute(
+                """INSERT INTO desk_notes (
+                       instrument_id, asof_td_label, author, bullets_json,
+                       created_at, bullets_formatted
+                   )
+                   VALUES (?, ?, 'Bernard', '[]', datetime('now'), ?)
+                   ON CONFLICT(instrument_id, asof_td_label)
+                   DO UPDATE SET
+                       bullets_formatted = excluded.bullets_formatted,
+                       updated_at = datetime('now')
+                """,
+                (instrument_id, asof_td_label, formatted_content)
+            )
+            conn.commit()
+            conn.close()
+            return True
+
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            print(f"Error updating formatted content: {e}")
+            return False
+
+    def get_media_files(self, symbol: str, category: str = None) -> list:
+        """Get media files for an instrument.
+
+        Args:
+            symbol: Instrument symbol
+            category: Optional category filter ('askslim', 'tradingview', 'other')
+
+        Returns:
+            List of media file records
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Get instrument_id
+            cursor.execute("SELECT instrument_id FROM instruments WHERE symbol = ?",
+                          (symbol,))
+            row = cursor.fetchone()
+            if not row:
+                conn.close()
+                return []
+            instrument_id = row['instrument_id']
+
+            if category:
+                cursor.execute(
+                    """SELECT media_id, category, timeframe, file_path, file_name,
+                              upload_date, source, notes, created_at
+                       FROM media_files
+                       WHERE instrument_id = ? AND category = ?
+                       ORDER BY upload_date DESC, created_at DESC
+                    """,
+                    (instrument_id, category)
+                )
+            else:
+                cursor.execute(
+                    """SELECT media_id, category, timeframe, file_path, file_name,
+                              upload_date, source, notes, created_at
+                       FROM media_files
+                       WHERE instrument_id = ?
+                       ORDER BY category, upload_date DESC, created_at DESC
+                    """,
+                    (instrument_id,)
+                )
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            # Convert relative paths to absolute paths
+            import os
+            from pathlib import Path
+            project_root = Path(__file__).parent.parent
+
+            results = []
+            for row in rows:
+                media = dict(row)
+                file_path = media['file_path']
+
+                # If path is relative, make it absolute
+                if not os.path.isabs(file_path):
+                    media['file_path'] = str(project_root / file_path)
+
+                results.append(media)
+
+            return results
+
+        except Exception as e:
+            print(f"Error getting media files: {e}")
+            return []
+
+    def insert_media_file(self, symbol: str, category: str,
+                         file_path: str, file_name: str, upload_date: str,
+                         source: str = 'manual', timeframe: str = None,
+                         notes: str = None) -> int:
+        """Insert a media file record.
+
+        Args:
+            symbol: Instrument symbol (e.g., 'ES', 'SPX')
+            category: Media category ('askslim', 'tradingview', 'other')
+            file_path: Full path to the file
+            file_name: File name (e.g., 'weekly_20251225.png')
+            upload_date: Date in YYYY-MM-DD format
+            source: 'scraper' or 'manual'
+            timeframe: 'DAILY', 'WEEKLY', or None
+            notes: Optional notes about the media
+
+        Returns:
+            media_id of the inserted record
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Get instrument_id
+            cursor.execute("SELECT instrument_id FROM instruments WHERE symbol = ?",
+                          (symbol,))
+            row = cursor.fetchone()
+            if not row:
+                raise ValueError(f"Instrument not found: {symbol}")
+            instrument_id = row['instrument_id']
+
+            cursor.execute(
+                """INSERT INTO media_files
+                   (instrument_id, category, timeframe, file_path, file_name,
+                    upload_date, source, notes, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                   ON CONFLICT(instrument_id, category, timeframe, file_name) DO UPDATE SET
+                       file_path = excluded.file_path,
+                       upload_date = excluded.upload_date,
+                       notes = COALESCE(excluded.notes, notes)
+                """,
+                (instrument_id, category, timeframe, file_path, file_name,
+                 upload_date, source, notes)
+            )
+            conn.commit()
+            media_id = cursor.lastrowid
+            conn.close()
+            return media_id
+
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            print(f"Error inserting media file: {e}")
+            raise
+
+    def delete_media_file(self, media_id: int) -> bool:
+        """Delete a media file record.
+
+        Args:
+            media_id: ID of the media file to delete
+
+        Returns:
+            True if deleted, False if not found
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM media_files WHERE media_id = ?", (media_id,))
+            conn.commit()
+            success = cursor.rowcount > 0
+            conn.close()
+            return success
+
+        except Exception as e:
+            conn.rollback()
+            conn.close()
+            print(f"Error deleting media file: {e}")
             return False

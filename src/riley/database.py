@@ -658,3 +658,240 @@ class Database:
         )
         conn.commit()
         return cursor.lastrowid
+
+    # ========================================================================
+    # MEDIA FILES METHODS
+    # ========================================================================
+
+    def insert_media_file(self, instrument_symbol: str, category: str,
+                         file_path: str, file_name: str, upload_date: str,
+                         source: str = 'manual', timeframe: Optional[str] = None,
+                         notes: Optional[str] = None) -> int:
+        """Insert a media file record.
+
+        Args:
+            instrument_symbol: Instrument symbol (e.g., 'ES', 'SPX')
+            category: Media category ('askslim', 'tradingview', 'other')
+            file_path: Full path to the file
+            file_name: File name (e.g., 'weekly_20251225.png')
+            upload_date: Date in YYYY-MM-DD format
+            source: 'scraper' or 'manual'
+            timeframe: 'DAILY', 'WEEKLY', or None
+            notes: Optional notes about the media
+
+        Returns:
+            media_id of the inserted record
+        """
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        # Get instrument_id
+        cursor.execute("SELECT instrument_id FROM instruments WHERE symbol = ?",
+                      (instrument_symbol,))
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError(f"Instrument not found: {instrument_symbol}")
+        instrument_id = row[0]
+
+        cursor.execute(
+            """INSERT INTO media_files
+               (instrument_id, category, timeframe, file_path, file_name,
+                upload_date, source, notes, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(instrument_id, category, timeframe, file_name) DO UPDATE SET
+                   file_path = excluded.file_path,
+                   upload_date = excluded.upload_date,
+                   notes = COALESCE(excluded.notes, notes)
+            """,
+            (instrument_id, category, timeframe, file_path, file_name,
+             upload_date, source, notes, datetime.now().isoformat())
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+    def get_media_files(self, instrument_symbol: str,
+                       category: Optional[str] = None) -> list[dict]:
+        """Get media files for an instrument.
+
+        Args:
+            instrument_symbol: Instrument symbol
+            category: Optional category filter ('askslim', 'tradingview', 'other')
+
+        Returns:
+            List of media file records
+        """
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        # Get instrument_id
+        cursor.execute("SELECT instrument_id FROM instruments WHERE symbol = ?",
+                      (instrument_symbol,))
+        row = cursor.fetchone()
+        if not row:
+            return []
+        instrument_id = row[0]
+
+        if category:
+            cursor.execute(
+                """SELECT media_id, category, timeframe, file_path, file_name,
+                          upload_date, source, notes, created_at
+                   FROM media_files
+                   WHERE instrument_id = ? AND category = ?
+                   ORDER BY upload_date DESC, created_at DESC
+                """,
+                (instrument_id, category)
+            )
+        else:
+            cursor.execute(
+                """SELECT media_id, category, timeframe, file_path, file_name,
+                          upload_date, source, notes, created_at
+                   FROM media_files
+                   WHERE instrument_id = ?
+                   ORDER BY category, upload_date DESC, created_at DESC
+                """,
+                (instrument_id,)
+            )
+
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    def delete_media_file(self, media_id: int) -> bool:
+        """Delete a media file record.
+
+        Args:
+            media_id: ID of the media file to delete
+
+        Returns:
+            True if deleted, False if not found
+        """
+        conn = self.connect()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM media_files WHERE media_id = ?", (media_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+
+    def delete_old_askslim_media(self, instrument_symbol: str,
+                                timeframe: str, current_date: str) -> int:
+        """Delete old askslim media files before scraping new ones.
+
+        This ensures we only keep the latest askslim charts and don't accumulate
+        old ones. Only deletes 'askslim' category files.
+
+        Args:
+            instrument_symbol: Instrument symbol
+            timeframe: 'DAILY' or 'WEEKLY'
+            current_date: Current date in YYYY-MM-DD format
+
+        Returns:
+            Number of records deleted
+        """
+        import os
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        # Get instrument_id
+        cursor.execute("SELECT instrument_id FROM instruments WHERE symbol = ?",
+                      (instrument_symbol,))
+        row = cursor.fetchone()
+        if not row:
+            return 0
+        instrument_id = row[0]
+
+        # Get file paths of old charts to delete from disk
+        cursor.execute(
+            """SELECT file_path FROM media_files
+               WHERE instrument_id = ?
+               AND category = 'askslim'
+               AND timeframe = ?
+               AND upload_date < ?
+            """,
+            (instrument_id, timeframe, current_date)
+        )
+        old_files = [row[0] for row in cursor.fetchall()]
+
+        # Delete physical files from disk
+        for file_path in old_files:
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except Exception as e:
+                print(f"Warning: Could not delete {file_path}: {e}")
+
+        # Delete database records
+        cursor.execute(
+            """DELETE FROM media_files
+               WHERE instrument_id = ?
+               AND category = 'askslim'
+               AND timeframe = ?
+               AND upload_date < ?
+            """,
+            (instrument_id, timeframe, current_date)
+        )
+        conn.commit()
+        return cursor.rowcount
+
+    def update_desk_note_analysis(self, instrument_symbol: str, asof_td_label: str,
+                                  analysis_text: str) -> bool:
+        """Update the analysis field in desk_notes.
+
+        Args:
+            instrument_symbol: Instrument symbol
+            asof_td_label: Trading day label (YYYY-MM-DD format)
+            analysis_text: Long-form analysis text
+
+        Returns:
+            True if updated, False if note doesn't exist
+        """
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        # Get instrument_id
+        cursor.execute("SELECT instrument_id FROM instruments WHERE symbol = ?",
+                      (instrument_symbol,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        instrument_id = row[0]
+
+        cursor.execute(
+            """UPDATE desk_notes
+               SET analysis = ?
+               WHERE instrument_id = ? AND asof_td_label = ?
+            """,
+            (analysis_text, instrument_id, asof_td_label)
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+    def update_desk_note_formatted(self, instrument_symbol: str, asof_td_label: str,
+                                   formatted_content: str) -> bool:
+        """Update the bullets_formatted field in desk_notes.
+
+        Args:
+            instrument_symbol: Instrument symbol
+            asof_td_label: Trading day label (YYYY-MM-DD format)
+            formatted_content: Rich text HTML/Markdown content
+
+        Returns:
+            True if updated, False if note doesn't exist
+        """
+        conn = self.connect()
+        cursor = conn.cursor()
+
+        # Get instrument_id
+        cursor.execute("SELECT instrument_id FROM instruments WHERE symbol = ?",
+                      (instrument_symbol,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        instrument_id = row[0]
+
+        cursor.execute(
+            """UPDATE desk_notes
+               SET bullets_formatted = ?
+               WHERE instrument_id = ? AND asof_td_label = ?
+            """,
+            (formatted_content, instrument_id, asof_td_label)
+        )
+        conn.commit()
+        return cursor.rowcount > 0

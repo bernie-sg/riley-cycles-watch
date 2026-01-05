@@ -29,4 +29,4 @@ CREATE TABLE desk_notes (
     UNIQUE(instrument_id, asof_td_label)  -- ONE NOTE PER DATE
 );
 
-CREATE INDEX idx_desk_notes_instrument_asof ON desk_notes(instrument_id, asof_td_label);
+CREATE INDEX IF NOT EXISTS idx_desk_notes_instrument_asof ON desk_notes(instrument_id, asof_td_label);

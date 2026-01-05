@@ -7,9 +7,14 @@ Daily job to scrape askSlim data and update Riley database.
 import sys
 from pathlib import Path
 
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
+
 # Import our modules
 from src.riley.modules.askslim.askslim_smoketest import verify_session
 from src.riley.modules.askslim.askslim_scraper import run_scraper
+from src.riley.modules.askslim.askslim_equities_scraper import run_equities_scraper
 from src.riley.cycles_rebuild import CyclesRebuilder
 
 
@@ -42,8 +47,8 @@ def run_daily_scrape():
 
     print("✓ Session is valid")
 
-    # Run the actual scraper
-    print("\n2. Running askSlim scraper...")
+    # Run the actual scrapers
+    print("\n2. Running askSlim scrapers...")
     print("   This will:")
     print("   - Navigate to Futures Hub and Equities Hub")
     print("   - Extract cycle data for all instruments")
@@ -52,10 +57,19 @@ def run_daily_scrape():
     print("")
 
     try:
+        print("\n2a. Running Futures Hub scraper...")
         run_scraper(headless=True)
-        print("\n✓ Scraping completed successfully")
+        print("\n✓ Futures Hub scraping completed")
     except Exception as e:
-        print(f"\n✗ Scraping failed: {e}")
+        print(f"\n✗ Futures Hub scraping failed: {e}")
+        return False
+
+    try:
+        print("\n2b. Running Equities Hub scraper...")
+        run_equities_scraper()
+        print("\n✓ Equities Hub scraping completed")
+    except Exception as e:
+        print(f"\n✗ Equities Hub scraping failed: {e}")
         return False
 
     # Rebuild cycle projections

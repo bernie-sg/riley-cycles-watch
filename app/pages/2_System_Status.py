@@ -158,7 +158,7 @@ with col1:
 with col2:
     st.subheader("Manual Controls")
 
-    if st.button("🔑 Login to askSlim", use_container_width=True):
+    if st.button("🔑 Login to askSlim", width='stretch'):
         with st.spinner("Logging in (may take up to 2 minutes)..."):
             try:
                 env = os.environ.copy()
@@ -186,7 +186,7 @@ with col2:
             except Exception as e:
                 st.error(f"❌ Error: {e}")
 
-    if st.button("✓ Verify Session", use_container_width=True):
+    if st.button("✓ Verify Session", width='stretch'):
         with st.spinner("Verifying session..."):
             try:
                 env = os.environ.copy()
@@ -214,7 +214,7 @@ with col2:
             except Exception as e:
                 st.error(f"❌ Error: {e}")
 
-    if st.button("▶️ Run Scraper Now", use_container_width=True, type="primary"):
+    if st.button("▶️ Run Scraper Now", width='stretch', type="primary"):
         with st.spinner("Running askSlim scraper (may take up to 1 hour)..."):
             try:
                 env = os.environ.copy()
@@ -288,7 +288,7 @@ with col1:
 with col2:
     st.subheader("Manual Controls")
 
-    if st.button("🔄 Update Market Data", use_container_width=True, type="primary"):
+    if st.button("🔄 Update Market Data", width='stretch', type="primary"):
         with st.spinner("Updating market data (may take 2-5 minutes)..."):
             try:
                 env = os.environ.copy()
@@ -370,7 +370,7 @@ with col1:
         if not df_scans.empty:
             # Format timestamps
             df_scans['Run At'] = pd.to_datetime(df_scans['Run At']).dt.strftime('%d-%b-%Y %H:%M:%S')
-            st.dataframe(df_scans, use_container_width=True, hide_index=True)
+            st.dataframe(df_scans, width='stretch', hide_index=True)
         else:
             st.info("No scans found")
 
@@ -380,7 +380,7 @@ with col1:
 with col2:
     st.subheader("Manual Controls")
 
-    if st.button("▶️ Run Cycle Scanner", use_container_width=True, type="primary"):
+    if st.button("▶️ Run Cycle Scanner", width='stretch', type="primary"):
         with st.spinner("Running cycle scanner..."):
             try:
                 env = os.environ.copy()

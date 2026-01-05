@@ -14,6 +14,14 @@ from datetime import datetime
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
+# Import Riley database
+# Add project root to path (5 levels up from this file)
+project_root_for_import = Path(__file__).parent.parent.parent.parent.parent
+if str(project_root_for_import) not in sys.path:
+    sys.path.insert(0, str(project_root_for_import))
+
+from src.riley.database import Database
+
 # Load environment variables
 load_dotenv()
 
@@ -314,8 +322,8 @@ def download_chart(modal_context, page, riley_symbol, timeframe):
 
         print(f"  → Chart URL: {img_src[:80]}...")
 
-        # Create media folder for instrument
-        inst_media_path = MEDIA_PATH / riley_symbol
+        # Create media folder for instrument (categorized by askslim)
+        inst_media_path = MEDIA_PATH / riley_symbol / "askslim"
         inst_media_path.mkdir(parents=True, exist_ok=True)
 
         # Filename with date
@@ -334,6 +342,26 @@ def download_chart(modal_context, page, riley_symbol, timeframe):
             with open(filepath, 'wb') as f:
                 f.write(response.body())
             print(f"  ✓ Downloaded chart: {filename}")
+
+            # Track in database (use relative path from project root)
+            try:
+                db = Database()
+                # Store relative path: media/SYMBOL/askslim/filename.png
+                relative_path = filepath.relative_to(PROJECT_ROOT)
+                db.insert_media_file(
+                    instrument_symbol=riley_symbol,
+                    category='askslim',
+                    timeframe=timeframe,
+                    file_path=str(relative_path),
+                    file_name=filename,
+                    upload_date=datetime.now().strftime("%Y-%m-%d"),
+                    source='scraper'
+                )
+                db.close()
+                print(f"  ✓ Tracked in database")
+            except Exception as e:
+                print(f"  ⚠ Database tracking failed: {e}")
+
             return True
         else:
             print(f"  ✗ Failed to download chart: {response.status}")
@@ -361,6 +389,19 @@ def scrape_instrument(page, askslim_symbol, iframe):
     print(f"\n{'='*60}")
     print(f"Scraping: {askslim_symbol} → {riley_symbol}")
     print(f"{'='*60}")
+
+    # Delete old askslim charts before scraping new ones
+    try:
+        db = Database()
+        today = datetime.now().strftime("%Y-%m-%d")
+        deleted_count = 0
+        deleted_count += db.delete_old_askslim_media(riley_symbol, 'WEEKLY', today)
+        deleted_count += db.delete_old_askslim_media(riley_symbol, 'DAILY', today)
+        if deleted_count > 0:
+            print(f"🗑 Deleted {deleted_count} old askslim chart(s)")
+        db.close()
+    except Exception as e:
+        print(f"⚠ Failed to clean old media: {e}")
 
     try:
         # Click on instrument button INSIDE the iframe
